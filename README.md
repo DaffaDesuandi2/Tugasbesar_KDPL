@@ -99,7 +99,7 @@ Pengembangan aplikasi mengacu pada tahapan Microsoft Security Development Lifecy
 | 1 | Muhammad Daffansyah Desuandi | 123140127 | [Peran] |
 | 2 | [Nama Anggota 2] | [NIM] | [Peran] |
 | 3 | Arsa Salsabila | 123140108 | [Peran] |
-| 4 | [Nama Anggota 4] | [NIM] | [Peran] |
+| 4 | Grace Exauditha Nababan | 123140115 | [Peran] |
 | 5 | [Nama Anggota 5] | [NIM] | [Peran] |
 
 ## 📂 Struktur Proyek
