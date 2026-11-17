@@ -5,8 +5,12 @@ dotenv.config();
 
 const { Pool } = pg;
 
+const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:123140131@localhost:5433/postera_db';
+const isCloudDb = !connectionString.includes('localhost') && !connectionString.includes('127.0.0.1');
+
 export const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgresql://postgres:123140131@localhost:5433/postera_db'
+  connectionString,
+  ssl: isCloudDb ? { rejectUnauthorized: false } : false
 });
 
 export async function initDatabase() {
