@@ -2,31 +2,21 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "FastAPI: Run PosTera Backend",
-            "type": "debugpy",
+            "name": "Node.js: Run PosTera Backend",
+            "type": "node",
             "request": "launch",
-            "module": "uvicorn",
-            "args": [
-                "app.main:app",
-                "--reload",
-                "--port",
-                "8000"
-            ],
+            "program": "${workspaceFolder}/backend/server.js",
             "cwd": "${workspaceFolder}/backend",
-            "jinja": true,
-            "justMyCode": true
+            "restart": true,
+            "console": "integratedTerminal"
         },
         {
-            "name": "Python: Run Tests (Pytest)",
-            "type": "debugpy",
+            "name": "Node.js: Run Tests",
+            "type": "node",
             "request": "launch",
-            "module": "pytest",
-            "args": [
-                "-v",
-                "tests/test_auth_security.py"
-            ],
+            "program": "${workspaceFolder}/backend/tests/auth.test.js",
             "cwd": "${workspaceFolder}/backend",
-            "justMyCode": true
+            "console": "integratedTerminal"
         }
     ]
 }
