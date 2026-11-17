@@ -86,7 +86,7 @@ Pengembangan aplikasi mengacu pada tahapan Microsoft Security Development Lifecy
 
 | Komponen | Teknologi |
 |---|---|
-| Frontend | Belum ditentukan |
+| Frontend | React |
 | Backend | Belum ditentukan |
 | Database | Belum ditentukan |
 | Version Control | Git & GitHub |
@@ -97,7 +97,7 @@ Pengembangan aplikasi mengacu pada tahapan Microsoft Security Development Lifecy
 | No. | Nama Anggota | NIM | Peran |
 |---|---|---|---|
 | 1 | Muhammad Daffansyah Desuandi | 123140127 | [Peran] |
-| 2 | [Nama Anggota 2] | [NIM] | [Peran] |
+| 2 | Ragil Bayu Saputra | 123140128 | [peran] |
 | 3 | Arsa Salsabila | 123140108 | [Peran] |
 | 4 | Grace Exauditha Nababan | 123140115 | [Peran] |
 | 5 | [Andre Prasetya Daely] | 123140131 | [Peran] |
