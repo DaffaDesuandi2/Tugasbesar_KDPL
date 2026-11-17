@@ -4,11 +4,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi.errors import RateLimitExceeded
 
-from app.api.routes.auth import router as auth_router
-from app.core.config import settings
-from app.core.limiter import limiter
-from app.db.base import Base
-from app.db.session import engine
+from app.auth import router as auth_router
+from app.database import Base, engine
+from app.security import ALLOWED_ORIGINS, limiter
 import app.models  # noqa: F401
 
 @asynccontextmanager
@@ -38,13 +36,13 @@ def rate_limit_handler(request: Request, exc: RateLimitExceeded):
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-app.include_router(auth_router, prefix=settings.API_V1_STR)
+app.include_router(auth_router, prefix="/api")
 
 @app.get("/", tags=["Health"])
 def root():
