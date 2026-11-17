@@ -26,7 +26,7 @@ beforeEach(async () => {
   await pool.query('DELETE FROM users');
 });
 
-test('1. Registrasi berhasil dan password terenkripsi bcrypt di database', async () => {
+test('registrasi user baru dengan password hash bcrypt', async () => {
   const res = await fetch(`${baseUrl}/api/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -42,16 +42,15 @@ test('1. Registrasi berhasil dan password terenkripsi bcrypt di database', async
   assert.strictEqual(data.email, 'andre.node@itera.ac.id');
   assert.strictEqual(data.role, 'mahasiswa');
   assert.strictEqual(data.is_active, true);
-  assert.strictEqual(data.password_hash, undefined); // Password tidak boleh bocor
+  assert.strictEqual(data.password_hash, undefined);
 
-  // Cek database
   const dbUser = await pool.query('SELECT * FROM users WHERE email = $1', ['andre.node@itera.ac.id']);
   assert.strictEqual(dbUser.rows.length, 1);
   assert.ok(dbUser.rows[0].password_hash.startsWith('$2a$') || dbUser.rows[0].password_hash.startsWith('$2b$'));
   assert.notStrictEqual(dbUser.rows[0].password_hash, 'PasswordAman123');
 });
 
-test('2. Registrasi menolak password yang lemah (< 8 karakter / tanpa angka / huruf besar)', async () => {
+test('menolak registrasi jika password lemah', async () => {
   const res = await fetch(`${baseUrl}/api/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -65,8 +64,7 @@ test('2. Registrasi menolak password yang lemah (< 8 karakter / tanpa angka / hu
   assert.strictEqual(res.status, 422);
 });
 
-test('3. Login berhasil, menerbitkan session_id baru, dan meregenerasi sesi (Anti-Session Fixation)', async () => {
-  // Register dulu
+test('login berhasil dan meregenerasi session id baru', async () => {
   await fetch(`${baseUrl}/api/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -77,7 +75,6 @@ test('3. Login berhasil, menerbitkan session_id baru, dan meregenerasi sesi (Ant
     })
   });
 
-  // Login 1
   const loginRes1 = await fetch(`${baseUrl}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -92,12 +89,10 @@ test('3. Login berhasil, menerbitkan session_id baru, dan meregenerasi sesi (Ant
   const session1 = data1.session_id;
   assert.ok(session1 && session1.length > 20);
 
-  // Cek cookie HTTP-Only
   const cookieHeader = loginRes1.headers.get('set-cookie');
   assert.ok(cookieHeader && cookieHeader.includes('postera_session='));
   assert.ok(cookieHeader.toLowerCase().includes('httponly'));
 
-  // Login 2 (Regenerasi Sesi Baru)
   const loginRes2 = await fetch(`${baseUrl}/api/auth/login`, {
     method: 'POST',
     headers: {
@@ -114,10 +109,8 @@ test('3. Login berhasil, menerbitkan session_id baru, dan meregenerasi sesi (Ant
   const data2 = await loginRes2.json();
   const session2 = data2.session_id;
 
-  // Session ID harus berbeda (Regenerasi)
   assert.notStrictEqual(session1, session2);
 
-  // Pastikan sesi lama sudah dihapus dari PostgreSQL
   const oldDbSession = await pool.query('SELECT * FROM sessions WHERE session_id = $1', [session1]);
   assert.strictEqual(oldDbSession.rows.length, 0);
 
@@ -125,7 +118,7 @@ test('3. Login berhasil, menerbitkan session_id baru, dan meregenerasi sesi (Ant
   assert.strictEqual(newDbSession.rows.length, 1);
 });
 
-test('4. Logout menghapus sesi dari database secara permanen', async () => {
+test('logout menghapus sesi dari database', async () => {
   await fetch(`${baseUrl}/api/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -146,27 +139,24 @@ test('4. Logout menghapus sesi dari database secara permanen', async () => {
   });
   const { session_id } = await loginRes.json();
 
-  // Cek /me sebelum logout
   const meRes1 = await fetch(`${baseUrl}/api/auth/me`, {
     headers: { 'Authorization': `Bearer ${session_id}` }
   });
   assert.strictEqual(meRes1.status, 200);
 
-  // Logout
   const logoutRes = await fetch(`${baseUrl}/api/auth/logout`, {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${session_id}` }
   });
   assert.strictEqual(logoutRes.status, 200);
 
-  // Cek /me setelah logout harus ditolak 401
   const meRes2 = await fetch(`${baseUrl}/api/auth/me`, {
     headers: { 'Authorization': `Bearer ${session_id}` }
   });
   assert.strictEqual(meRes2.status, 401);
 });
 
-test('5. Rate limiter login memblokir serangan brute force (maks 5 request/menit)', async () => {
+test('rate limit login memblokir percobaan berlebih', async () => {
   for (let i = 0; i < 5; i++) {
     await fetch(`${baseUrl}/api/auth/login`, {
       method: 'POST',
@@ -178,7 +168,6 @@ test('5. Rate limiter login memblokir serangan brute force (maks 5 request/menit
     });
   }
 
-  // Request ke-6 harus diblokir oleh rate limiter (HTTP 429)
   const blockedRes = await fetch(`${baseUrl}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

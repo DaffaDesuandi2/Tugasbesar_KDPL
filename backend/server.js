@@ -19,10 +19,8 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 
-// Mount API routes
 app.use('/api/auth', authRouter);
 
-// Health check
 app.get('/', (req, res) => {
   res.json({
     status: 'ok',

@@ -45,7 +45,6 @@ export function validatePasswordStrength(password) {
   return null;
 }
 
-// Rate Limiting: Maksimal 5 percobaan per menit per IP
 export const loginLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 5,

@@ -12,7 +12,6 @@ import {
 
 export const authRouter = Router();
 
-// Helper untuk mengambil session ID dari Cookie atau Header
 export function getSessionId(req) {
   if (req.cookies && req.cookies[SESSION_COOKIE_NAME]) {
     return req.cookies[SESSION_COOKIE_NAME];
@@ -27,7 +26,6 @@ export function getSessionId(req) {
   return null;
 }
 
-// Middleware proteksi sesi
 export async function authenticateUser(req, res, next) {
   const sessionId = getSessionId(req);
   if (!sessionId) {
@@ -45,9 +43,7 @@ export async function authenticateUser(req, res, next) {
     }
 
     const session = sessionRes.rows[0];
-    const now = new Date();
-
-    if (new Date(session.expires_at) < now) {
+    if (new Date(session.expires_at) < new Date()) {
       await pool.query('DELETE FROM sessions WHERE id = $1', [session.id]);
       return res.status(401).json({ detail: 'Sesi telah kedaluwarsa.' });
     }
@@ -74,7 +70,6 @@ export async function authenticateUser(req, res, next) {
   }
 }
 
-// 1. Endpoint Registrasi
 authRouter.post('/register', async (req, res) => {
   const { name, email, password } = req.body || {};
 
@@ -112,7 +107,6 @@ authRouter.post('/register', async (req, res) => {
   }
 });
 
-// 2. Endpoint Login (Rate Limiter & Regenerasi ID Sesi)
 authRouter.post('/login', loginLimiter, async (req, res) => {
   const { email, password } = req.body || {};
 
@@ -143,16 +137,13 @@ authRouter.post('/login', loginLimiter, async (req, res) => {
       return res.status(403).json({ detail: 'Akun Anda telah dinonaktifkan.' });
     }
 
-    // Reset failed login attempts
     await pool.query('UPDATE users SET failed_login_attempts = 0 WHERE id = $1', [user.id]);
 
-    // Hapus sesi lama jika ada di request
     const oldSessionId = getSessionId(req);
     if (oldSessionId) {
       await pool.query('DELETE FROM sessions WHERE session_id = $1', [oldSessionId]);
     }
 
-    // Regenerasi Session ID baru acak (CSPRNG)
     const newSessionId = generateSessionId();
     const expiresAt = new Date(Date.now() + SESSION_EXPIRE_HOURS * 3600 * 1000);
     const clientIp = req.ip || req.connection?.remoteAddress || null;
@@ -164,7 +155,6 @@ authRouter.post('/login', loginLimiter, async (req, res) => {
       [newSessionId, user.id, clientIp, userAgent, expiresAt]
     );
 
-    // Pasang HTTP-Only Cookie
     res.cookie(SESSION_COOKIE_NAME, newSessionId, {
       maxAge: SESSION_EXPIRE_HOURS * 3600 * 1000,
       httpOnly: true,
@@ -189,7 +179,6 @@ authRouter.post('/login', loginLimiter, async (req, res) => {
   }
 });
 
-// 3. Endpoint Logout
 authRouter.post('/logout', authenticateUser, async (req, res) => {
   try {
     if (req.sessionId) {
@@ -207,7 +196,6 @@ authRouter.post('/logout', authenticateUser, async (req, res) => {
   }
 });
 
-// 4. Endpoint Profil
 authRouter.get('/me', authenticateUser, (req, res) => {
   return res.status(200).json(req.user);
 });
