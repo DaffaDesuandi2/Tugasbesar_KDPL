@@ -77,8 +77,13 @@ authRouter.post('/register', async (req, res) => {
     return res.status(422).json({ detail: 'Nama minimal 2 karakter.' });
   }
 
-  if (!email || !email.includes('@')) {
-    return res.status(422).json({ detail: 'Format email tidak valid.' });
+  const cleanEmail = (email || '').toLowerCase().trim();
+  const iteraStudentRegex = /^[a-z0-9._%+-]+@student\.itera\.ac\.id$/;
+
+  if (!cleanEmail || !iteraStudentRegex.test(cleanEmail)) {
+    return res.status(422).json({
+      detail: 'Pendaftaran hanya diperbolehkan menggunakan email @student.itera.ac.id.'
+    });
   }
 
   const pwdError = validatePasswordStrength(password);
@@ -87,7 +92,6 @@ authRouter.post('/register', async (req, res) => {
   }
 
   try {
-    const cleanEmail = email.toLowerCase().trim();
     const existing = await pool.query('SELECT id FROM users WHERE email = $1', [cleanEmail]);
     if (existing.rows.length > 0) {
       return res.status(409).json({ detail: 'Email sudah terdaftar.' });

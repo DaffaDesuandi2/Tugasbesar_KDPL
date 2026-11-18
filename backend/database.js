@@ -28,10 +28,13 @@ export async function initDatabase() {
         is_active BOOLEAN DEFAULT TRUE NOT NULL,
         failed_login_attempts INT DEFAULT 0 NOT NULL CHECK (failed_login_attempts >= 0),
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        CONSTRAINT check_itera_student_email CHECK (
+          role = 'admin' OR email ~* '^[A-Za-z0-9._%+-]+@student\\.itera\\.ac\\.id$'
+        )
       );
     `);
-
+    
     await client.query(`
       CREATE TABLE IF NOT EXISTS sessions (
         id SERIAL PRIMARY KEY,
@@ -91,7 +94,7 @@ export async function initDatabase() {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
     `);
-    
+
     await client.query('COMMIT');
   } catch (error) {
     await client.query('ROLLBACK');
