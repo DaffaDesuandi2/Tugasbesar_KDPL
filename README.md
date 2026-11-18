@@ -87,8 +87,8 @@ Pengembangan aplikasi mengacu pada tahapan Microsoft Security Development Lifecy
 | Komponen | Teknologi |
 |---|---|
 | Frontend | React |
-| Backend | Belum ditentukan |
-| Database | Belum ditentukan |
+| Backend | Node.js |
+| Database | PostgreSQL |
 | Version Control | Git & GitHub |
 | Security Framework | Microsoft SDL |
 
