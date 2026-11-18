@@ -98,7 +98,7 @@ Pengembangan aplikasi mengacu pada tahapan Microsoft Security Development Lifecy
 |---|---|---|---|
 | 1 | Muhammad Daffansyah Desuandi | 123140127 | [Peran] |
 | 2 | Ragil Bayu Saputra | 123140128 | [peran] |
-| 3 | Arsa Salsabila | 123140108 | [Peran] |
+| 3 | Arsa Salsabila | 123140108 | QA / Security Tester |
 | 4 | Grace Exauditha Nababan | 123140115 | [Peran] |
 | 5 | [Andre Prasetya Daely] | 123140131 | [Peran] |
 
