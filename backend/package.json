@@ -10,6 +10,8 @@
     "migrate": "node migrate.js",
     "seed": "node seed.js",
     "test": "node --test tests/auth.test.js"
+    "test": "node --test tests/*.test.js",
+    "test:authorization": "node --test tests/authorization.test.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
