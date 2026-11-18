@@ -48,7 +48,7 @@ export async function initDatabase() {
     `);
 
     await client.query(`
-      CREATE TABLE IF NOT EXISTS posters (
+      CREATE TABLE IF NOT EXISTS articles (
         id SERIAL PRIMARY KEY,
         user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         title VARCHAR(150) NOT NULL CHECK (LENGTH(TRIM(title)) >= 3),
@@ -62,20 +62,10 @@ export async function initDatabase() {
     `);
 
     await client.query(`
-      CREATE TABLE IF NOT EXISTS poster_likes (
+      CREATE TABLE IF NOT EXISTS article_comments (
         id SERIAL PRIMARY KEY,
         user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        poster_id INT NOT NULL REFERENCES posters(id) ON DELETE CASCADE,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        CONSTRAINT unique_user_poster_like UNIQUE (user_id, poster_id)
-      );
-    `);
-
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS poster_comments (
-        id SERIAL PRIMARY KEY,
-        user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        poster_id INT NOT NULL REFERENCES posters(id) ON DELETE CASCADE,
+        article_id INT NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
         content TEXT NOT NULL CHECK (LENGTH(TRIM(content)) > 0),
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
