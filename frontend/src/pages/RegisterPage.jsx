@@ -7,7 +7,7 @@ export default function RegisterPage() {
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
-    username: '',
+    name: '',
     email: '',
     password: '',
     password_confirmation: '',
@@ -19,14 +19,20 @@ export default function RegisterPage() {
 
   const validateClientSide = () => {
     const newErrors = {};
-    const usernameRegex = /^[a-zA-Z0-9]{3,20}$/;
 
-    if (!usernameRegex.test(formData.username.trim())) {
-      newErrors.username = 'Username harus 3-20 karakter alfanumerik (huruf & angka saja).';
+    if (formData.name.trim().length < 2) {
+      newErrors.name = 'Nama minimal 2 karakter.';
     }
     if (formData.password.length < 8) {
       newErrors.password = 'Password minimal 8 karakter.';
+    } else if (!/[A-Z]/.test(formData.password)) {
+      newErrors.password = 'Password harus mengandung minimal 1 huruf besar (A-Z).';
+    } else if (!/[a-z]/.test(formData.password)) {
+      newErrors.password = 'Password harus mengandung minimal 1 huruf kecil (a-z).';
+    } else if (!/[0-9]/.test(formData.password)) {
+      newErrors.password = 'Password harus mengandung minimal 1 angka (0-9).';
     }
+
     if (formData.password !== formData.password_confirmation) {
       newErrors.password_confirmation = 'Konfirmasi password tidak cocok.';
     }
@@ -35,11 +41,7 @@ export default function RegisterPage() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-
+    setFormData((prev) => ({ ...prev, [name]: value }));
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: '' }));
     }
@@ -58,18 +60,14 @@ export default function RegisterPage() {
 
     setIsSubmitting(true);
     try {
-      await register(
-        formData.username,
-        formData.email,
-        formData.password,
-        formData.password_confirmation
-      );
-      navigate('/user/dashboard');
+      await register(formData.name, formData.email, formData.password);
+      navigate('/login');
     } catch (err) {
-      if (err.response?.status === 422 && err.response?.data?.errors) {
-        setErrors(err.response.data.errors);
+      const detail = err.response?.data?.detail;
+      if (err.response?.status === 409) {
+        setErrors({ email: detail || 'Email sudah terdaftar.' });
       } else {
-        setGeneralError(err.response?.data?.message || 'Terjadi kesalahan saat mendaftar.');
+        setGeneralError(detail || 'Terjadi kesalahan saat mendaftar.');
       }
     } finally {
       setIsSubmitting(false);
@@ -119,36 +117,26 @@ export default function RegisterPage() {
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div>
-              <label
-                htmlFor="reg-username"
-                className="block text-[14px] font-semibold text-[#1F2937] mb-1.5"
-              >
-                Username
+              <label htmlFor="reg-name" className="block text-[14px] font-semibold text-[#1F2937] mb-1.5">
+                Nama Lengkap
               </label>
               <input
-                id="reg-username"
+                id="reg-name"
                 type="text"
-                name="username"
-                autoComplete="username"
-                maxLength={20}
-                value={formData.username}
+                name="name"
+                autoComplete="name"
+                maxLength={100}
+                value={formData.name}
                 onChange={handleChange}
-                placeholder="ragilbayu12"
+                placeholder="Ragil Bayu Saputra"
                 required
-                className={getInputClass(Boolean(errors.username))}
+                className={getInputClass(Boolean(errors.name))}
               />
-              {errors.username && (
-                <p className="text-[13px] text-[#B91C1C] mt-1">
-                  {Array.isArray(errors.username) ? errors.username[0] : errors.username}
-                </p>
-              )}
+              {errors.name && <p className="text-[13px] text-[#B91C1C] mt-1">{errors.name}</p>}
             </div>
 
             <div>
-              <label
-                htmlFor="reg-email"
-                className="block text-[14px] font-semibold text-[#1F2937] mb-1.5"
-              >
+              <label htmlFor="reg-email" className="block text-[14px] font-semibold text-[#1F2937] mb-1.5">
                 Email Kampus / Aktif
               </label>
               <input
@@ -162,18 +150,11 @@ export default function RegisterPage() {
                 required
                 className={getInputClass(Boolean(errors.email))}
               />
-              {errors.email && (
-                <p className="text-[13px] text-[#B91C1C] mt-1">
-                  {Array.isArray(errors.email) ? errors.email[0] : errors.email}
-                </p>
-              )}
+              {errors.email && <p className="text-[13px] text-[#B91C1C] mt-1">{errors.email}</p>}
             </div>
 
             <div>
-              <label
-                htmlFor="reg-password"
-                className="block text-[14px] font-semibold text-[#1F2937] mb-1.5"
-              >
+              <label htmlFor="reg-password" className="block text-[14px] font-semibold text-[#1F2937] mb-1.5">
                 Password
               </label>
               <input
@@ -183,22 +164,15 @@ export default function RegisterPage() {
                 autoComplete="new-password"
                 value={formData.password}
                 onChange={handleChange}
-                placeholder="Minimal 8 karakter"
+                placeholder="Min. 8 karakter (huruf besar, kecil & angka)"
                 required
                 className={getInputClass(Boolean(errors.password))}
               />
-              {errors.password && (
-                <p className="text-[13px] text-[#B91C1C] mt-1">
-                  {Array.isArray(errors.password) ? errors.password[0] : errors.password}
-                </p>
-              )}
+              {errors.password && <p className="text-[13px] text-[#B91C1C] mt-1">{errors.password}</p>}
             </div>
 
             <div>
-              <label
-                htmlFor="reg-confirm"
-                className="block text-[14px] font-semibold text-[#1F2937] mb-1.5"
-              >
+              <label htmlFor="reg-confirm" className="block text-[14px] font-semibold text-[#1F2937] mb-1.5">
                 Konfirmasi Password
               </label>
               <input
@@ -213,9 +187,7 @@ export default function RegisterPage() {
                 className={getInputClass(Boolean(errors.password_confirmation))}
               />
               {errors.password_confirmation && (
-                <p className="text-[13px] text-[#B91C1C] mt-1">
-                  {errors.password_confirmation}
-                </p>
+                <p className="text-[13px] text-[#B91C1C] mt-1">{errors.password_confirmation}</p>
               )}
             </div>
 
@@ -227,10 +199,7 @@ export default function RegisterPage() {
                 onChange={(e) => setShowPassword(e.target.checked)}
                 className="w-4 h-4 rounded border-[#9CA3AF] accent-[#0369A1] cursor-pointer"
               />
-              <label
-                htmlFor="register-show-password"
-                className="text-[14px] font-normal text-[#4B5563] cursor-pointer select-none"
-              >
+              <label htmlFor="register-show-password" className="text-[14px] font-normal text-[#4B5563] cursor-pointer select-none">
                 Tampilkan password
               </label>
             </div>
@@ -245,10 +214,7 @@ export default function RegisterPage() {
 
             <p className="text-[14px] font-normal text-[#4B5563] text-center mt-1">
               Sudah punya akun?{' '}
-              <Link
-                to="/login"
-                className="font-semibold text-[#0369A1] hover:underline"
-              >
+              <Link to="/login" className="font-semibold text-[#0369A1] hover:underline">
                 Masuk di sini
               </Link>
             </p>

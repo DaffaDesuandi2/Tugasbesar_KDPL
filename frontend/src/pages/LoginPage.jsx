@@ -35,7 +35,7 @@ export default function LoginPage() {
       if (status === 429) {
         setErrorMessage('Terlalu banyak percobaan login. Silakan tunggu 1 menit sebelum mencoba lagi.');
       } else if (status === 401 || status === 422) {
-        setErrorMessage('Kredensial yang diberikan tidak cocok dengan catatan kami.');
+        setErrorMessage('Email atau Password tidak valid.');
       } else if (status === 403) {
         setErrorMessage('Akun Anda telah dinonaktifkan oleh Administrator.');
       } else {

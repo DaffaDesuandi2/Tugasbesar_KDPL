@@ -67,7 +67,7 @@ export default function App() {
           <Route
             path="/user/dashboard"
             element={
-              <ProtectedRoute allowedRole="user">
+              <ProtectedRoute allowedRole="mahasiswa">
                 <UserDashboardPage />
               </ProtectedRoute>
             }
