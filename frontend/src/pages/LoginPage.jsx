@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export default function LoginPage() {
   const { login, sessionMessage, clearSessionMessage } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -24,10 +25,16 @@ export default function LoginPage() {
 
     try {
       const data = await login(email, password);
+      const redirectParam = searchParams.get('redirect');
+      const safeRedirect =
+        redirectParam && redirectParam.startsWith('/') && !redirectParam.startsWith('//')
+          ? redirectParam
+          : '/';
+
       if (data?.user?.role === 'admin') {
-        navigate('/admin/dashboard');
+        navigate('/admin/dashboard', { replace: true });
       } else {
-        navigate('/user/dashboard');
+        navigate(safeRedirect, { replace: true });
       }
     } catch (err) {
       const status = err.response?.status;

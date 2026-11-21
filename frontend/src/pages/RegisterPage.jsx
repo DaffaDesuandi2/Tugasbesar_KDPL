@@ -1,16 +1,18 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import api from '../api/axios';
 
 export default function RegisterPage() {
-  const { register } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const savedData = location.state?.savedFormData;
 
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    password_confirmation: '',
+    name: savedData?.name || '',
+    email: savedData?.email || '',
+    password: savedData?.password || '',
+    password_confirmation: savedData?.password_confirmation || '',
   });
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
@@ -58,16 +60,40 @@ export default function RegisterPage() {
       return;
     }
 
+    const cleanEmail = formData.email.trim().toLowerCase();
     setIsSubmitting(true);
+
     try {
-      await register(formData.name, formData.email, formData.password);
-      navigate('/login');
+      await api.post('/api/auth/send-otp', {
+        name: formData.name.trim(),
+        email: cleanEmail,
+      });
+
+      navigate('/verify-otp', {
+        state: {
+          registrationData: {
+            ...formData,
+            email: cleanEmail,
+          },
+        },
+      });
     } catch (err) {
+      const status = err.response?.status;
       const detail = err.response?.data?.detail;
-      if (err.response?.status === 409) {
+
+      if (status === 409) {
         setErrors({ email: detail || 'Email sudah terdaftar.' });
+      } else if (status === 404) {
+        navigate('/verify-otp', {
+          state: {
+            registrationData: {
+              ...formData,
+              email: cleanEmail,
+            },
+          },
+        });
       } else {
-        setGeneralError(detail || 'Terjadi kesalahan saat mendaftar.');
+        setGeneralError(detail || 'Gagal mengirim kode verifikasi ke email.');
       }
     } finally {
       setIsSubmitting(false);
@@ -209,7 +235,7 @@ export default function RegisterPage() {
               disabled={isSubmitting}
               className="w-full h-11.5 bg-[#0369A1] hover:bg-[#075985] disabled:bg-[#0369A1] disabled:opacity-60 disabled:cursor-not-allowed text-[#FFFFFF] text-[15px] font-semibold rounded-md border-0 transition cursor-pointer"
             >
-              {isSubmitting ? 'Memproses...' : 'Daftar Sekarang'}
+              {isSubmitting ? 'Mengirim OTP...' : 'Daftar Sekarang'}
             </button>
 
             <p className="text-[14px] font-normal text-[#4B5563] text-center mt-1">

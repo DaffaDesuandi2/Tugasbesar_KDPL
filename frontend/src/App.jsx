@@ -1,10 +1,13 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import HomePage from './pages/HomePage';
+import ArticlesPage from './pages/ArticlesPage';
+import ArticleDetailPage from './pages/ArticleDetailPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import UserDashboardPage from './pages/UserDashboardPage';
 import AdminDashboardPage from './pages/AdminDashboardPage';
+import VerifyOtpPage from './pages/VerifyOtpPage';
 
 const ProtectedRoute = ({ children, allowedRole }) => {
   const { user, loading } = useAuth();
@@ -35,8 +38,7 @@ const GuestRoute = ({ children }) => {
   if (loading) return null;
 
   if (user) {
-    const redirectPath = user.role === 'admin' ? '/admin/dashboard' : '/user/dashboard';
-    return <Navigate to={redirectPath} replace />;
+    return <Navigate to="/" replace />;
   }
 
   return children;
@@ -48,6 +50,8 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<HomePage />} />
+          <Route path="/artikel" element={<ArticlesPage />} />
+          <Route path="/artikel/:slug" element={<ArticleDetailPage />} />
           <Route
             path="/login"
             element={
@@ -61,6 +65,14 @@ export default function App() {
             element={
               <GuestRoute>
                 <RegisterPage />
+              </GuestRoute>
+            }
+          />
+          <Route
+            path="/verify-otp"
+            element={
+              <GuestRoute>
+                <VerifyOtpPage />
               </GuestRoute>
             }
           />

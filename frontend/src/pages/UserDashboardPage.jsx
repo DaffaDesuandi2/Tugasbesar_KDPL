@@ -1,48 +1,387 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import Navbar from '../components/Navbar';
+import ArticleCard from '../components/ArticleCard';
+import Footer from '../components/Footer';
 import { useAuth } from '../context/AuthContext';
+import { MOCK_ARTICLES } from '../data/mockArticles';
+
+const INITIAL_USER_COMMENTS = [
+  {
+    id: 501,
+    article_slug: 'tips-lolos-seleksi-magang',
+    article_title: 'Tips Lolos Seleksi Magang',
+    content: 'Boleh ditambahkan contoh format CV yang bagus?',
+    time_ago: '1 jam lalu',
+  },
+  {
+    id: 502,
+    article_slug: 'cara-belajar-laravel-dari-nol',
+    article_title: 'Cara Belajar Laravel dari Nol',
+    content: 'Setuju, mulai dari routing dulu lebih mudah.',
+    time_ago: 'Kemarin',
+  },
+  {
+    id: 503,
+    article_slug: 'review-buku-basis-data',
+    article_title: 'Review Buku Basis Data',
+    content: 'Ringkasannya rapi, terima kasih!',
+    time_ago: '15 Nov 2026',
+  },
+];
 
 export default function UserDashboardPage() {
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  const handleLogout = async () => {
-    setIsLoggingOut(true);
+  const [myComments, setMyComments] = useState([]);
+  const [totalCommentsCount, setTotalCommentsCount] = useState(12);
+  const [isLoadingComments, setIsLoadingComments] = useState(true);
+  const [showAllComments, setShowAllComments] = useState(false);
+
+  const [editingId, setEditingId] = useState(null);
+  const [editingText, setEditingText] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  const [deleteTargetId, setDeleteTargetId] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadUserComments = async () => {
+      setIsLoadingComments(true);
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        if (!isMounted) return;
+        setMyComments(INITIAL_USER_COMMENTS);
+      } catch (err) {
+        if (err.response?.status === 401) {
+          await logout();
+          navigate('/login', { replace: true });
+        }
+      } finally {
+        if (isMounted) setIsLoadingComments(false);
+      }
+    };
+
+    loadUserComments();
+    return () => {
+      isMounted = false;
+    };
+  }, [logout, navigate]);
+
+  const formatJoinDate = (createdAt) => {
+    if (!createdAt) return '12 Okt 2026';
+    const parsed = new Date(createdAt);
+    if (Number.isNaN(parsed.getTime())) return createdAt;
+    return parsed.toLocaleDateString('id-ID', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+  };
+
+  const handleStartEdit = (comment) => {
+    setEditingId(comment.id);
+    setEditingText(comment.content);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setEditingText('');
+  };
+
+  const handleSaveEdit = async (commentId) => {
+    const trimmed = editingText.trim().slice(0, 500);
+    if (!trimmed) return;
+
+    setIsSavingEdit(true);
     try {
-      await logout();
-      navigate('/login');
+      setMyComments((prev) =>
+        prev.map((item) =>
+          item.id === commentId
+            ? { ...item, content: trimmed, time_ago: 'Diedit baru saja' }
+            : item
+        )
+      );
+      setEditingId(null);
+      setEditingText('');
     } catch (err) {
-      console.error('Gagal logout:', err);
+      if (err.response?.status === 401) {
+        await logout();
+        navigate('/login', { replace: true });
+      }
     } finally {
-      setIsLoggingOut(false);
+      setIsSavingEdit(false);
     }
   };
 
+  const handleConfirmDelete = async () => {
+    if (!deleteTargetId) return;
+
+    setIsDeleting(true);
+    try {
+      setMyComments((prev) => prev.filter((item) => item.id !== deleteTargetId));
+      setTotalCommentsCount((prev) => Math.max(0, prev - 1));
+      setDeleteTargetId(null);
+    } catch (err) {
+      if (err.response?.status === 401) {
+        await logout();
+        navigate('/login', { replace: true });
+      }
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const displayedComments = showAllComments ? myComments : myComments.slice(0, 5);
+  const displayName = user?.name || 'Ragil Bayu';
+  const joinDateText = formatJoinDate(user?.created_at);
+
   return (
-    <div className="min-h-screen bg-[#F3F4F6] p-4 md:p-8">
-      <div className="max-w-225 mx-auto bg-[#FFFFFF] rounded-[10px] shadow-[0_2px_12px_rgba(0,0,0,0.08)] overflow-hidden">
-        <div className="bg-[#0C4A6E] px-6 py-4 flex items-center justify-between">
-          <span className="text-[20px] font-bold text-white">PosTera</span>
-          <span className="text-xs font-semibold uppercase tracking-wider bg-white/15 text-[#E0F2FE] px-3 py-1 rounded-full">
-            Portal Mahasiswa (User)
-          </span>
-        </div>
+    <div className="min-h-screen flex flex-col bg-gray-100">
+      <Navbar />
 
-        <div className="p-6 md:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <h1 className="text-[22px] font-bold text-[#1F2937]">
-            Selamat Datang di Website PosTera (User)
-          </h1>
+      <main className="flex-1 w-full max-w-300 mx-auto px-4 sm:px-8 lg:px-14 pt-2 flex flex-col gap-6.5">
+        <section className="bg-[#0C4A6E] rounded-2xl px-6 py-6.5 sm:px-9 sm:py-7.5 text-white flex flex-col min-[900px]:flex-row min-[900px]:items-center justify-between gap-6">
+          <div className="flex flex-col items-start">
+            <span className="bg-[#DCFCE7] text-[#166534] text-xs font-bold px-3 py-1.25 rounded-full uppercase mb-3">
+              AKUN AKTIF
+            </span>
 
-          <button
-            onClick={handleLogout}
-            disabled={isLoggingOut}
-            className="h-10.5 px-5 bg-[#B91C1C] hover:bg-[#991B1B] disabled:opacity-60 disabled:cursor-not-allowed text-white text-[14px] font-semibold rounded-md transition cursor-pointer shrink-0"
-          >
-            {isLoggingOut ? 'Keluar...' : 'Logout'}
-          </button>
+            <h1 className="text-[24px] sm:text-[30px] font-extrabold leading-tight mb-1.5">
+              Halo, {displayName}
+            </h1>
+
+            <p className="text-[15px] text-[#E0F2FE] mb-4.5">
+              Baca artikel terbaru dan ikuti diskusi di kolom komentar.
+            </p>
+
+            <Link
+              to="/artikel"
+              className="bg-white text-[#0C4A6E] px-5.5 py-2.5 rounded-full text-sm font-semibold hover:bg-[#E0F2FE] transition-colors"
+            >
+              Jelajahi Artikel
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-2 sm:flex items-center gap-4 shrink-0">
+            <div className="bg-white/14 rounded-xl px-6.5 py-4.5 text-center min-w-34">
+              <div className="text-[24px] sm:text-[28px] font-extrabold leading-tight">
+                {totalCommentsCount}
+              </div>
+              <div className="text-[13px] text-[#E0F2FE] mt-1">
+                Komentar Saya
+              </div>
+            </div>
+
+            <div className="bg-white/14 rounded-xl px-6.5 py-4.5 text-center min-w-40">
+              <div className="text-[22px] sm:text-[28px] font-extrabold leading-tight">
+                {joinDateText}
+              </div>
+              <div className="text-[13px] text-[#E0F2FE] mt-1">
+                Bergabung
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="bg-white rounded-[10px] p-5.5 shadow-[0_2px_12px_rgba(0,0,0,0.08)]">
+          <div className="flex items-center justify-between mb-2.5">
+            <h2 className="text-lg font-bold text-[#1F2937]">Komentar Saya</h2>
+            {myComments.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowAllComments((prev) => !prev)}
+                className="text-sm font-semibold text-[#0369A1] hover:underline cursor-pointer"
+              >
+                {showAllComments ? 'Tampilkan ringkas' : 'Lihat semua'}
+              </button>
+            )}
+          </div>
+
+          {isLoadingComments ? (
+            <div className="divide-y divide-[#F3F4F6]">
+              {[1, 2, 3].map((skeleton) => (
+                <div key={skeleton} className="py-3.5 flex justify-between gap-4 animate-pulse">
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 w-48 bg-[#E5E7EB] rounded" />
+                    <div className="h-4 w-3/4 bg-[#E5E7EB] rounded" />
+                    <div className="h-3 w-20 bg-[#E5E7EB] rounded" />
+                  </div>
+                  <div className="h-4 w-20 bg-[#E5E7EB] rounded" />
+                </div>
+              ))}
+            </div>
+          ) : displayedComments.length === 0 ? (
+            <div className="py-10 text-center flex flex-col items-center gap-3">
+              <p className="text-sm text-[#4B5563]">
+                Anda belum menulis komentar. Mulai berdiskusi di artikel pilihan Anda.
+              </p>
+              <Link
+                to="/artikel"
+                className="px-5.5 py-2.5 rounded-full bg-[#0369A1] text-white text-sm font-semibold hover:bg-[#0C4A6E] transition-colors"
+              >
+                Jelajahi Artikel
+              </Link>
+            </div>
+          ) : (
+            <div className="divide-y divide-[#F3F4F6]">
+              {displayedComments.map((comment) => {
+                const isEditing = editingId === comment.id;
+
+                return (
+                  <div
+                    key={comment.id}
+                    className="py-3.5 first:pt-2 last:pb-1 flex flex-col min-[900px]:flex-row min-[900px]:items-start justify-between gap-3 min-[900px]:gap-4"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <Link
+                        to={`/artikel/${comment.article_slug}`}
+                        className="text-sm font-bold text-[#0C4A6E] hover:underline"
+                      >
+                        {comment.article_title}
+                      </Link>
+
+                      {isEditing ? (
+                        <div className="mt-2 flex flex-col gap-2.5">
+                          <textarea
+                            maxLength={500}
+                            value={editingText}
+                            onChange={(e) => setEditingText(e.target.value)}
+                            className="w-full min-h-20 border border-[#9CA3AF] rounded-lg p-3 text-sm text-[#1F2937] outline-none focus:border-[#0369A1]"
+                          />
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[13px] text-[#4B5563]">
+                              {editingText.length}/500
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={handleCancelEdit}
+                                disabled={isSavingEdit}
+                                className="h-8.5 px-4 rounded-md border border-[#9CA3AF] bg-white text-[13px] font-semibold text-[#1F2937] hover:bg-gray-50 transition-colors cursor-pointer"
+                              >
+                                Batal
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleSaveEdit(comment.id)}
+                                disabled={isSavingEdit || !editingText.trim()}
+                                className="h-8.5 px-4 rounded-md bg-[#0369A1] hover:bg-[#0C4A6E] disabled:opacity-50 text-white text-[13px] font-semibold transition-colors cursor-pointer"
+                              >
+                                {isSavingEdit ? 'Menyimpan...' : 'Simpan'}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          {/* Teks komentar dirender sebagai teks biasa aman (SR-INP-03) */}
+                          <p className="mt-1 text-sm leading-normal text-[#1F2937] wrap-break-word">
+                            {comment.content}
+                          </p>
+                          <p className="mt-1 text-xs text-[#4B5563]">
+                            {comment.time_ago}
+                          </p>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Aksi Edit & Hapus (di kanan pada desktop >= 900px, pindah ke bawah isi komentar pada < 900px) */}
+                    {!isEditing && (
+                      <div className="flex items-center gap-3.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleStartEdit(comment)}
+                          className="text-[13px] font-semibold text-[#0369A1] hover:underline cursor-pointer"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeleteTargetId(comment.id)}
+                          className="text-[13px] font-semibold text-[#B91C1C] hover:underline cursor-pointer"
+                        >
+                          Hapus
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        <section aria-label="Artikel untuk Dibaca" className="flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-[22px] font-bold text-[#1F2937]">
+              Artikel untuk Dibaca
+            </h2>
+            <Link
+              to="/artikel"
+              className="text-sm font-semibold text-[#0369A1] hover:underline"
+            >
+              Lihat semua
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {MOCK_ARTICLES.slice(0, 3).map((article) => (
+              <ArticleCard
+                key={article.id}
+                article={article}
+                isFeatured={false}
+                compactCover={true}
+              />
+            ))}
+          </div>
+        </section>
+
+        <Footer />
+      </main>
+
+      {deleteTargetId !== null && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-delete-title"
+          className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4"
+        >
+          <div className="w-full max-w-105 bg-white rounded-[14px] p-7 shadow-xl">
+            <h3
+              id="modal-delete-title"
+              className="text-xl font-bold text-[#1F2937]"
+            >
+              Hapus komentar ini?
+            </h3>
+            <p className="mt-2 text-sm text-[#4B5563] leading-relaxed">
+              Komentar yang sudah dihapus tidak dapat dikembalikan lagi.
+            </p>
+
+            <div className="mt-6 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setDeleteTargetId(null)}
+                disabled={isDeleting}
+                className="h-10.5 px-5 rounded-lg border border-[#9CA3AF] bg-white text-sm font-semibold text-[#1F2937] hover:bg-gray-50 transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                className="h-10.5 px-5 rounded-lg bg-[#B91C1C] hover:bg-red-800 disabled:opacity-50 text-white text-sm font-semibold transition-colors cursor-pointer"
+              >
+                {isDeleting ? 'Menghapus...' : 'Hapus'}
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
