@@ -5,6 +5,15 @@ import rateLimit from 'express-rate-limit';
 export const SESSION_COOKIE_NAME = 'postera_session';
 export const SESSION_EXPIRE_HOURS = 24;
 
+export function getSessionCookieOptions() {
+  return {
+    maxAge: SESSION_EXPIRE_HOURS * 3600 * 1000,
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production'
+  };
+}
+
 export const ALLOWED_ORIGINS = [
   'http://localhost:5173',
   'http://localhost:3000',
@@ -50,6 +59,7 @@ export const loginLimiter = rateLimit({
   max: 5,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => req.headers['x-forwarded-for'] || req.ip,
   handler: (req, res) => {
     return res.status(429).json({
       detail: 'Terlalu banyak percobaan login. Silakan coba beberapa saat lagi.'

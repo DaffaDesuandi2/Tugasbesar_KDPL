@@ -4,13 +4,17 @@ import {
   SESSION_COOKIE_NAME,
   SESSION_EXPIRE_HOURS,
   generateSessionId,
+  getSessionCookieOptions,
   hashPassword,
   loginLimiter,
-  validatePasswordStrength,
   verifyPassword
 } from './security.js';
+import { validateRegisterInput, validateLoginInput } from './middleware/validation.js';
+import { csrfTokenHandler } from './middleware/csrf.js';
 
 export const authRouter = Router();
+
+authRouter.get('/csrf-token', csrfTokenHandler);
 
 export function getSessionId(req) {
   if (req.cookies && req.cookies[SESSION_COOKIE_NAME]) {
@@ -70,29 +74,11 @@ export async function authenticateUser(req, res, next) {
   }
 }
 
-authRouter.post('/register', async (req, res) => {
-  const { name, email, password } = req.body || {};
-
-  if (!name || name.trim().length < 2) {
-    return res.status(422).json({ detail: 'Nama minimal 2 karakter.' });
-  }
-
-  const cleanEmail = (email || '').toLowerCase().trim();
-  const iteraStudentRegex = /^[a-z0-9._%+-]+@student\.itera\.ac\.id$/;
-
-  if (!cleanEmail || !iteraStudentRegex.test(cleanEmail)) {
-    return res.status(422).json({
-      detail: 'Pendaftaran hanya diperbolehkan menggunakan email @student.itera.ac.id.'
-    });
-  }
-
-  const pwdError = validatePasswordStrength(password);
-  if (pwdError) {
-    return res.status(422).json({ detail: pwdError });
-  }
+authRouter.post('/register', validateRegisterInput, async (req, res) => {
+  const { name, email, password } = req.validatedBody;
 
   try {
-    const existing = await pool.query('SELECT id FROM users WHERE email = $1', [cleanEmail]);
+    const existing = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
     if (existing.rows.length > 0) {
       return res.status(409).json({ detail: 'Email sudah terdaftar.' });
     }
@@ -102,7 +88,7 @@ authRouter.post('/register', async (req, res) => {
       `INSERT INTO users (name, email, password_hash, role, is_active, failed_login_attempts, created_at, updated_at)
        VALUES ($1, $2, $3, 'mahasiswa', true, 0, NOW(), NOW())
        RETURNING id, name, email, role, is_active, created_at`,
-      [name.trim(), cleanEmail, passwordHash]
+      [name, email, passwordHash]
     );
 
     return res.status(201).json(result.rows[0]);
@@ -111,16 +97,11 @@ authRouter.post('/register', async (req, res) => {
   }
 });
 
-authRouter.post('/login', loginLimiter, async (req, res) => {
-  const { email, password } = req.body || {};
-
-  if (!email || !password) {
-    return res.status(400).json({ detail: 'Email dan password wajib diisi.' });
-  }
+authRouter.post('/login', loginLimiter, validateLoginInput, async (req, res) => {
+  const { email, password } = req.validatedBody;
 
   try {
-    const cleanEmail = email.toLowerCase().trim();
-    const userRes = await pool.query('SELECT * FROM users WHERE email = $1', [cleanEmail]);
+    const userRes = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
 
     if (userRes.rows.length === 0) {
       return res.status(401).json({ detail: 'Email atau kata sandi tidak valid.' });
@@ -159,12 +140,7 @@ authRouter.post('/login', loginLimiter, async (req, res) => {
       [newSessionId, user.id, clientIp, userAgent, expiresAt]
     );
 
-    res.cookie(SESSION_COOKIE_NAME, newSessionId, {
-      maxAge: SESSION_EXPIRE_HOURS * 3600 * 1000,
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: false
-    });
+    res.cookie(SESSION_COOKIE_NAME, newSessionId, getSessionCookieOptions());
 
     return res.status(200).json({
       message: 'Login berhasil.',
@@ -191,7 +167,8 @@ authRouter.post('/logout', authenticateUser, async (req, res) => {
 
     res.clearCookie(SESSION_COOKIE_NAME, {
       httpOnly: true,
-      sameSite: 'lax'
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production'
     });
 
     return res.status(200).json({ message: 'Logout berhasil.' });

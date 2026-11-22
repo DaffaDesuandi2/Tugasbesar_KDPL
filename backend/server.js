@@ -6,6 +6,7 @@ import { initDatabase } from './database.js';
 import { authRouter } from './auth.js';
 import { adminRouter } from './adminRoutes.js';
 import { ALLOWED_ORIGINS } from './security.js';
+import { verifyCsrfToken } from './middleware/csrf.js';
 
 dotenv.config();
 
@@ -19,6 +20,7 @@ app.use(cors({
 
 app.use(express.json());
 app.use(cookieParser());
+app.use(verifyCsrfToken);
 
 app.use('/api/auth', authRouter);
 app.use('/api/admin', adminRouter);
