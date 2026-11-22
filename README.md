@@ -100,7 +100,7 @@ Pengembangan aplikasi mengacu pada tahapan Microsoft Security Development Lifecy
 | 2 | Ragil Bayu Saputra | 123140128 | [Frontend Developer] |
 | 3 | Arsa Salsabila | 123140108 | QA / Security Tester |
 | 4 | Grace Exauditha Nababan | 123140115 | [Peran] |
-| 5 | [Andre Prasetya Daely] | 123140131 | [Peran] |
+| 5 | [Andre Prasetya Daely] | 123140131 | [Backend Developer] |
 
 ## 📂 Struktur Proyek
 
