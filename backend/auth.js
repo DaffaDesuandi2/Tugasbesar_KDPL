@@ -12,6 +12,7 @@ import {
 } from './security.js';
 import { validateRegisterInput, validateLoginInput } from './middleware/validation.js';
 import { csrfTokenHandler } from './middleware/csrf.js';
+import { sendOtpEmail } from './mailer.js';
 
 export const authRouter = Router();
 
@@ -99,7 +100,7 @@ authRouter.post('/send-otp', async (req, res) => {
       [cleanEmail, otp, expiresAt]
     );
 
-    console.log(`[PosTera OTP] Kode verifikasi untuk ${cleanEmail}: ${otp}`);
+    await sendOtpEmail(cleanEmail, otp);
     return res.status(200).json({ message: 'Kode OTP berhasil dikirim.' });
   } catch (error) {
     return res.status(500).json({ detail: 'Gagal mengirim kode OTP.' });
@@ -136,7 +137,7 @@ authRouter.post('/resend-otp', async (req, res) => {
       [cleanEmail, otp, expiresAt]
     );
 
-    console.log(`[PosTera OTP Resend] Kode verifikasi baru untuk ${cleanEmail}: ${otp}`);
+    await sendOtpEmail(cleanEmail, otp);
     return res.status(200).json({ message: 'Kode OTP baru berhasil dikirim.' });
   } catch (error) {
     return res.status(500).json({ detail: 'Gagal mengirim ulang kode OTP.' });
