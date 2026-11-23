@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import { initDatabase } from './database.js';
 import { authRouter } from './auth.js';
 import { adminRouter } from './adminRoutes.js';
+import { articleRouter } from './articleRoutes.js';
 import { ALLOWED_ORIGINS } from './security.js';
 import { verifyCsrfToken } from './middleware/csrf.js';
 
@@ -24,6 +25,7 @@ app.use(verifyCsrfToken);
 
 app.use('/api/auth', authRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/articles', articleRouter);
 
 app.get('/', (req, res) => {
   res.json({

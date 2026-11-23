@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import crypto from 'crypto';
 import { pool } from './database.js';
 import {
   SESSION_COOKIE_NAME,
@@ -73,6 +74,115 @@ export async function authenticateUser(req, res, next) {
     return res.status(500).json({ detail: 'Terjadi kesalahan pada server.' });
   }
 }
+
+authRouter.post('/send-otp', async (req, res) => {
+  const { email } = req.body || {};
+  const cleanEmail = (email || '').toLowerCase().trim();
+  const campusRegex = /^[a-z0-9._%+-]+@(student\.)?itera\.ac\.id$/i;
+
+  if (!cleanEmail || !campusRegex.test(cleanEmail)) {
+    return res.status(400).json({ detail: 'Format email tidak valid. Gunakan email resmi ITERA.' });
+  }
+
+  try {
+    const existing = await pool.query('SELECT id FROM users WHERE email = $1', [cleanEmail]);
+    if (existing.rows.length > 0) {
+      return res.status(409).json({ detail: 'Email sudah terdaftar.' });
+    }
+
+    const otp = crypto.randomInt(100000, 1000000).toString();
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+
+    await pool.query('DELETE FROM otps WHERE email = $1', [cleanEmail]);
+    await pool.query(
+      'INSERT INTO otps (email, otp_code, expires_at, created_at) VALUES ($1, $2, $3, NOW())',
+      [cleanEmail, otp, expiresAt]
+    );
+
+    console.log(`[PosTera OTP] Kode verifikasi untuk ${cleanEmail}: ${otp}`);
+    return res.status(200).json({ message: 'Kode OTP berhasil dikirim.' });
+  } catch (error) {
+    return res.status(500).json({ detail: 'Gagal mengirim kode OTP.' });
+  }
+});
+
+authRouter.post('/resend-otp', async (req, res) => {
+  const { email } = req.body || {};
+  const cleanEmail = (email || '').toLowerCase().trim();
+
+  if (!cleanEmail) {
+    return res.status(400).json({ detail: 'Email wajib diisi.' });
+  }
+
+  try {
+    const latestOtp = await pool.query(
+      'SELECT created_at FROM otps WHERE email = $1 ORDER BY created_at DESC LIMIT 1',
+      [cleanEmail]
+    );
+
+    if (latestOtp.rows.length > 0) {
+      const secondsSinceLast = (Date.now() - new Date(latestOtp.rows[0].created_at).getTime()) / 1000;
+      if (secondsSinceLast < 30) {
+        return res.status(429).json({ detail: 'Mohon tunggu 30 detik sebelum meminta OTP ulang.' });
+      }
+    }
+
+    const otp = crypto.randomInt(100000, 1000000).toString();
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+
+    await pool.query('DELETE FROM otps WHERE email = $1', [cleanEmail]);
+    await pool.query(
+      'INSERT INTO otps (email, otp_code, expires_at, created_at) VALUES ($1, $2, $3, NOW())',
+      [cleanEmail, otp, expiresAt]
+    );
+
+    console.log(`[PosTera OTP Resend] Kode verifikasi baru untuk ${cleanEmail}: ${otp}`);
+    return res.status(200).json({ message: 'Kode OTP baru berhasil dikirim.' });
+  } catch (error) {
+    return res.status(500).json({ detail: 'Gagal mengirim ulang kode OTP.' });
+  }
+});
+
+authRouter.post('/verify-otp', async (req, res) => {
+  const { email, otp } = req.body || {};
+  const cleanEmail = (email || '').toLowerCase().trim();
+  const cleanOtp = (otp || '').trim();
+
+  if (!cleanEmail || !cleanOtp) {
+    return res.status(400).json({ detail: 'Email dan kode OTP wajib diisi.' });
+  }
+
+  try {
+    const otpRes = await pool.query(
+      'SELECT * FROM otps WHERE email = $1 ORDER BY created_at DESC LIMIT 1',
+      [cleanEmail]
+    );
+
+    if (otpRes.rows.length === 0) {
+      return res.status(400).json({ detail: 'Kode OTP tidak ditemukan atau telah kedaluwarsa.' });
+    }
+
+    const otpRow = otpRes.rows[0];
+    if (new Date(otpRow.expires_at) < new Date()) {
+      await pool.query('DELETE FROM otps WHERE id = $1', [otpRow.id]);
+      return res.status(400).json({ detail: 'Kode OTP telah kedaluwarsa. Silakan minta kode baru.' });
+    }
+
+    if (otpRow.otp_code !== cleanOtp) {
+      await pool.query('UPDATE otps SET attempts = attempts + 1 WHERE id = $1', [otpRow.id]);
+      if (otpRow.attempts + 1 >= 5) {
+        await pool.query('DELETE FROM otps WHERE id = $1', [otpRow.id]);
+        return res.status(400).json({ detail: 'Terlalu banyak percobaan salah. Silakan minta kode baru.' });
+      }
+      return res.status(400).json({ detail: 'Kode OTP salah.' });
+    }
+
+    await pool.query('DELETE FROM otps WHERE email = $1', [cleanEmail]);
+    return res.status(200).json({ message: 'Verifikasi OTP berhasil.' });
+  } catch (error) {
+    return res.status(500).json({ detail: 'Terjadi kesalahan saat memverifikasi OTP.' });
+  }
+});
 
 authRouter.post('/register', validateRegisterInput, async (req, res) => {
   const { name, email, password } = req.validatedBody;
