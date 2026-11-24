@@ -219,3 +219,209 @@ test('Security Test 5: Akun admin yang berstatus dinonaktifkan (is_active: false
     'Pesan penolakan harus jelas'
   );
 });
+
+/**
+ * ============================================================================
+ * HELPER FUNCTION: getCsrfToken
+ * Mengambil token CSRF valid dari endpoint /api/auth/csrf-token
+ * untuk disertakan pada request pengujian mutasi (POST/PUT/PATCH/DELETE)
+ * agar lolos dari proteksi CSRF Middleware (SR-AUTH-03).
+ * ============================================================================
+ */
+async function getCsrfToken() {
+  const res = await fetch(`${baseUrl}/api/auth/csrf-token`);
+  const data = await res.json();
+  const setCookie = res.headers.get('set-cookie') || '';
+  const match = setCookie.match(/postera_csrf=([^;]+)/);
+  const token = data.csrfToken;
+  const cookieHeader = match ? `postera_csrf=${match[1]}` : `postera_csrf=${token}`;
+
+  return { token, cookieHeader };
+}
+
+// ============================================================================
+// TEST CASE 6 (UJI POSITIF): ADMIN MENGUBAH STATUS KEAKTIFAN USER & AUDIT LOG
+// 
+// Kebutuhan Keamanan: SR-AUTHZ-01 (Otorisasi Admin) & SR-AUD-01 (Audit Trail)
+// Sudut Pengujian: Positif (Alur kerja operasional normal yang sah)
+// Deskripsi: Membuktikan bahwa Admin yang sah dapat menonaktifkan akun mahasiswa
+//            yang melanggar aturan, dan sistem secara otomatis mencatat bukti aksi
+//            tersebut ke dalam tabel audit_logs untuk kebutuhan investigasi forensik.
+// ============================================================================
+test('Security Test 6: Admin berhasil menonaktifkan pengguna & mencatat audit log (HTTP 200)', async () => {
+  // 1. SETUP CSRF: Mengambil token CSRF agar lolos dari proteksi anti-CSRF
+  const { token: csrfToken, cookieHeader } = await getCsrfToken();
+
+  // 2. SETUP DATA UJI: Membuat 1 akun Admin aktif yang memiliki token sesi login sah
+  const { sessionId: adminSessionId } = await createUserAndSession({
+    name: 'Admin PosTera',
+    email: 'admin.utama@postera.ac.id',
+    password: 'AdminPassword123',
+    role: 'admin',
+    isActive: true
+  });
+
+  // 3. SETUP DATA TARGET: Membuat 1 akun Mahasiswa aktif yang nantinya akan dinonaktifkan
+  const { user: studentUser } = await createUserAndSession({
+    name: 'Mahasiswa Uji',
+    email: 'mahasiswa.uji@student.itera.ac.id',
+    password: 'StudentPassword123',
+    role: 'mahasiswa',
+    isActive: true
+  });
+
+  // 4. EKSEKUSI REQUEST: Admin mengirim request HTTP PATCH dengan header CSRF valid
+  const res = await fetch(`${baseUrl}/api/admin/users/${studentUser.id}/status`, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${adminSessionId}`, // Token sesi Admin
+      'Content-Type': 'application/json',
+      'x-csrf-token': csrfToken,                  // Token proteksi CSRF
+      'Cookie': cookieHeader                      // Cookie CSRF
+    },
+    body: JSON.stringify({ is_active: false })    // Parameter perubahan: dinonaktifkan
+  });
+
+  // 5. VERIFIKASI STATUS HTTP: Server wajib merespons dengan kode 200 OK
+  assert.strictEqual(
+    res.status,
+    200,
+    'Admin yang sah harus berhasil menonaktifkan status akun pengguna dengan kode HTTP 200'
+  );
+
+  // 6. VERIFIKASI BODY RESPON: Memastikan data JSON yang dikembalikan mengonfirmasi is_active bernilai false
+  const data = await res.json();
+  assert.strictEqual(
+    data.user.is_active,
+    false,
+    'Respons JSON dari server harus mengonfirmasi status pengguna kini bernilai false'
+  );
+
+  // 7. VERIFIKASI DATABASE (INTEGRITAS DATA): Memastikan nilai di tabel users benar-benar berubah di PostgreSQL
+  const dbCheck = await pool.query(
+    'SELECT is_active FROM users WHERE id = $1',
+    [studentUser.id]
+  );
+  assert.strictEqual(
+    dbCheck.rows[0].is_active,
+    false,
+    'Integritas DB: Nilai kolom is_active pada tabel users harus benar-benar berubah menjadi false'
+  );
+
+  // 8. VERIFIKASI AUDIT LOG (SR-AUD-01): Memastikan aksi Admin otomatis terekam tanpa bisa dimanipulasi
+  const logCheck = await pool.query(
+    'SELECT action, entity_type, entity_id FROM audit_logs WHERE entity_id = $1',
+    [studentUser.id]
+  );
+  assert.ok(
+    logCheck.rows.length > 0,
+    'Kritis: Aksi perubahan status akun WAJIB tercatat di tabel audit_logs untuk kepatuhan SDL (SR-AUD-01)'
+  );
+  assert.strictEqual(
+    logCheck.rows[0].action,
+    'TOGGLE_USER_STATUS',
+    'Nama action pada audit_logs harus akurat yaitu TOGGLE_USER_STATUS'
+  );
+});
+
+// ============================================================================
+// TEST CASE 7 (UJI NEGATIF): VALIDASI INPUT & KETAHANAN PARAMETER (TYPE SAFETY)
+// 
+// Kebutuhan Keamanan: SR-VAL-01 (Validasi Input Server-Side & Anti-Tampering)
+// Sudut Pengujian: Negatif (Input sengaja dirusak/manipulasi parameter)
+// Deskripsi: Membuktikan bahwa server menolak manipulasi parameter URL (ID bukan integer)
+//            dan manipulasi tipe data body (is_active dikirim string, bukan boolean).
+// ============================================================================
+test('Security Test 7: Validasi input menolak parameter tidak valid (HTTP 422)', async () => {
+  // 1. SETUP: Ambil token CSRF dan akun Admin sah
+  const { token: csrfToken, cookieHeader } = await getCsrfToken();
+  const { sessionId: adminSessionId } = await createUserAndSession({
+    name: 'Admin PosTera',
+    email: 'admin.validator@postera.ac.id',
+    password: 'AdminPassword123',
+    role: 'admin',
+    isActive: true
+  });
+
+  // 2. SKENARIO NEGATIF A (Parameter Tampering): Mengirim ID berupa string 'abc'
+  const resBadId = await fetch(`${baseUrl}/api/admin/users/abc/status`, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${adminSessionId}`,
+      'Content-Type': 'application/json',
+      'x-csrf-token': csrfToken,
+      'Cookie': cookieHeader
+    },
+    body: JSON.stringify({ is_active: false })
+  });
+  // Server harus menolak format salah dengan HTTP 422
+  assert.strictEqual(
+    resBadId.status,
+    422,
+    'Parameter ID yang bukan integer positif harus ditolak dengan kode HTTP 422'
+  );
+
+  // 3. SKENARIO NEGATIF B (Type Confusion): Mengirim is_active berupa string bukan boolean
+  const resBadBody = await fetch(`${baseUrl}/api/admin/users/1/status`, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${adminSessionId}`,
+      'Content-Type': 'application/json',
+      'x-csrf-token': csrfToken,
+      'Cookie': cookieHeader
+    },
+    body: JSON.stringify({ is_active: 'bukan_boolean' })
+  });
+  // Server harus menolak tipe non-boolean dengan HTTP 422
+  assert.strictEqual(
+    resBadBody.status,
+    422,
+    'Field is_active yang bukan bertipe boolean murni (true/false) harus ditolak dengan kode HTTP 422'
+  );
+});
+
+// ============================================================================
+// TEST CASE 8 (KONDISI BATAS): PENCEGAHAN ADMIN MENONAKTIFKAN DIRINYA SENDIRI
+// 
+// Kebutuhan Keamanan: SR-AUTHZ-02 & Pencegahan DoS / System Lockout
+// Sudut Pengujian: Kondisi Batas / Edge Case
+// Deskripsi: Memastikan sistem memblokir jika Admin tidak sengaja mencoba menonaktifkan
+//            akun miliknya sendiri demi mencegah kelumpuhan akses admin (lockout).
+// ============================================================================
+test('Security Test 8: Admin dilarang menonaktifkan akun miliknya sendiri (HTTP 400)', async () => {
+  // 1. SETUP: Ambil token CSRF dan akun Admin
+  const { token: csrfToken, cookieHeader } = await getCsrfToken();
+  const { user: adminUser, sessionId: adminSessionId } = await createUserAndSession({
+    name: 'Admin Utama',
+    email: 'admin.self@postera.ac.id',
+    password: 'AdminPassword123',
+    role: 'admin',
+    isActive: true
+  });
+
+  // 2. SKENARIO UJI: Admin mengirim request PATCH menonaktifkan ID miliknya sendiri
+  const res = await fetch(`${baseUrl}/api/admin/users/${adminUser.id}/status`, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${adminSessionId}`,
+      'Content-Type': 'application/json',
+      'x-csrf-token': csrfToken,
+      'Cookie': cookieHeader
+    },
+    body: JSON.stringify({ is_active: false })
+  });
+
+  // 3. VERIFIKASI: Server wajib menolak dengan kode HTTP 400 Bad Request
+  assert.strictEqual(
+    res.status,
+    400,
+    'Sistem wajib menolak self-deactivation dengan HTTP 400 demi mencegah penguncian sistem (system lockout)'
+  );
+
+  // 4. VERIFIKASI PESAN: Pesan penolakan harus jelas
+  const data = await res.json();
+  assert.ok(
+    data.detail.includes('tidak diizinkan') || data.detail.includes('lockout'),
+    'Pesan penolakan harus jelas menjelaskan bahwa admin tidak boleh menonaktifkan akunnya sendiri'
+  );
+});
