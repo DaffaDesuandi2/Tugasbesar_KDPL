@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 
-const EMAIL_CAMPUS_REGEX = /^[a-z0-9._%+-]+@(student\.)?itera\.ac\.id$/i;
+const EMAIL_CAMPUS_REGEX = /^[a-z0-9._%+-]+@student\.itera\.ac\.id$/i;
 
 export default function RegisterPage() {
   const navigate = useNavigate();
@@ -31,7 +31,7 @@ export default function RegisterPage() {
     }
 
     if (!cleanEmail || !EMAIL_CAMPUS_REGEX.test(cleanEmail)) {
-      newErrors.email = 'Format email tidak valid. Gunakan email resmi sivitas akademika ITERA (@student.itera.ac.id).';
+      newErrors.email = 'Format email tidak valid. Gunakan email resmi mahasiswa ITERA (@student.itera.ac.id).';
     }
 
     if (formData.password.length < 8) {
@@ -91,24 +91,14 @@ export default function RegisterPage() {
       });
     } catch (err) {
       const status = err.response?.status;
-      const detail = err.response?.data?.detail;
+      const msg = err.response?.data?.message || err.response?.data?.detail;
 
       if (status === 409) {
-        setErrors({ email: detail || 'Email sudah terdaftar.' });
+        setErrors({ email: msg || 'Email sudah terdaftar.' });
       } else if (status === 400) {
-        setErrors({ email: detail || 'Format email tidak valid.' });
-      } else if (status === 404) {
-        navigate('/verify-otp', {
-          state: {
-            registrationData: {
-              ...formData,
-              name: cleanName,
-              email: cleanEmail,
-            },
-          },
-        });
+        setErrors({ email: msg || 'Format email tidak valid.' });
       } else {
-        setGeneralError(detail || 'Gagal mengirim kode verifikasi ke email.');
+        setGeneralError(msg || 'Gagal mengirim kode verifikasi ke email.');
       }
     } finally {
       setIsSubmitting(false);

@@ -3,8 +3,8 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 
-const OTP_EXPIRE_SECONDS = 10 * 60; 
-const RESEND_COOLDOWN_SECONDS = 60; 
+const OTP_EXPIRE_SECONDS = 10 * 60;
+const RESEND_COOLDOWN_SECONDS = 60;
 const MAX_RESEND_ATTEMPTS = 5;
 
 export default function VerifyOtpPage() {
@@ -133,21 +133,22 @@ export default function VerifyOtpPage() {
     setInfoMessage('');
 
     try {
-      await api.post('/api/auth/resend-otp', { email });
-    } catch (err) {
-      if (err.response?.status && err.response.status !== 404) {
-        setErrorMessage(err.response?.data?.detail || 'Gagal mengirim ulang kode OTP.');
-        return;
-      }
-    }
+      await api.post('/api/auth/send-otp', { email });
 
-    setOtp(['', '', '', '', '', '']);
-    setTimeLeft(OTP_EXPIRE_SECONDS);
-    setResendCooldown(RESEND_COOLDOWN_SECONDS);
-    setResendCount((prev) => prev + 1);
-    setInfoMessage('Kode OTP baru telah dikirim ke email Anda.');
-    inputRefs.current[0]?.focus();
-    setActiveIndex(0);
+      setOtp(['', '', '', '', '', '']);
+      setTimeLeft(OTP_EXPIRE_SECONDS);
+      setResendCooldown(RESEND_COOLDOWN_SECONDS);
+      setResendCount((prev) => prev + 1);
+      setInfoMessage('Kode OTP baru telah dikirim ke email Anda.');
+      inputRefs.current[0]?.focus();
+      setActiveIndex(0);
+    } catch (err) {
+      setErrorMessage(
+        err.response?.data?.message ||
+          err.response?.data?.detail ||
+          'Gagal mengirim ulang kode OTP.'
+      );
+    }
   };
 
   const handleVerify = async (e) => {
@@ -180,28 +181,11 @@ export default function VerifyOtpPage() {
       );
       setIsSuccess(true);
     } catch (err) {
-      if (err.response?.status === 404) {
-        if (code === '123456') {
-          try {
-            await register(
-              registrationData.name,
-              registrationData.email,
-              registrationData.password
-            );
-            setIsSuccess(true);
-          } catch (regErr) {
-            setErrorMessage(
-              regErr.response?.data?.detail || 'Gagal menyimpan akun setelah verifikasi.'
-            );
-          }
-        } else {
-          setErrorMessage('Kode verifikasi tidak valid. (Mode simulasi: gunakan 123456)');
-        }
-      } else {
-        setErrorMessage(
-          err.response?.data?.detail || 'Kode verifikasi salah atau sudah kedaluwarsa.'
-        );
-      }
+      setErrorMessage(
+        err.response?.data?.message ||
+          err.response?.data?.detail ||
+          'Kode verifikasi salah atau sudah kedaluwarsa.'
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -215,7 +199,6 @@ export default function VerifyOtpPage() {
   return (
     <div className="min-h-screen bg-[#F3F4F6] pt-10 pb-10 px-4 flex justify-center items-start">
       <div className="w-full max-w-120 bg-[#FFFFFF] rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.08)] overflow-hidden text-center">
-        
         <div className="bg-[#E0F2FE] pt-8 pb-7 px-4 flex flex-col items-center justify-center gap-3">
           <div className="text-[18px] font-bold text-[#0C4A6E] leading-none">
             PosTera
@@ -260,7 +243,6 @@ export default function VerifyOtpPage() {
         </div>
 
         <div className="px-5 py-6 min-[520px]:pt-8 min-[520px]:px-11 min-[520px]:pb-9 flex flex-col gap-5">
-          
           <div>
             <h1 className="text-[26px] font-bold text-[#1F2937] leading-[1.3] mb-2">
               Cek Email Anda
