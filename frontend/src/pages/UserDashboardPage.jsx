@@ -4,40 +4,42 @@ import Navbar from '../components/Navbar';
 import ArticleCard from '../components/ArticleCard';
 import Footer from '../components/Footer';
 import { useAuth } from '../context/AuthContext';
-import { MOCK_ARTICLES } from '../data/mockArticles';
+import api from '../api/axios';
 
-const INITIAL_USER_COMMENTS = [
-  {
-    id: 501,
-    article_slug: 'tips-lolos-seleksi-magang',
-    article_title: 'Tips Lolos Seleksi Magang',
-    content: 'Boleh ditambahkan contoh format CV yang bagus?',
-    time_ago: '1 jam lalu',
-  },
-  {
-    id: 502,
-    article_slug: 'cara-belajar-laravel-dari-nol',
-    article_title: 'Cara Belajar Laravel dari Nol',
-    content: 'Setuju, mulai dari routing dulu lebih mudah.',
-    time_ago: 'Kemarin',
-  },
-  {
-    id: 503,
-    article_slug: 'review-buku-basis-data',
-    article_title: 'Review Buku Basis Data',
-    content: 'Ringkasannya rapi, terima kasih!',
-    time_ago: '15 Nov 2026',
-  },
-];
+function formatRelativeOrDate(dateString) {
+  if (!dateString) return 'Baru saja';
+  const parsed = new Date(dateString);
+  if (Number.isNaN(parsed.getTime())) return dateString;
+
+  const diffMs = Date.now() - parsed.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return 'Baru saja';
+  if (diffMins < 60) return `${diffMins} menit lalu`;
+
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours} jam lalu`;
+
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays === 1) return 'Kemarin';
+
+  return parsed.toLocaleDateString('id-ID', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+}
 
 export default function UserDashboardPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
   const [myComments, setMyComments] = useState([]);
-  const [totalCommentsCount, setTotalCommentsCount] = useState(12);
+  const [totalCommentsCount, setTotalCommentsCount] = useState(0);
   const [isLoadingComments, setIsLoadingComments] = useState(true);
   const [showAllComments, setShowAllComments] = useState(false);
+
+  const [recommendedArticles, setRecommendedArticles] = useState([]);
+  const [isLoadingArticles, setIsLoadingArticles] = useState(true);
 
   const [editingId, setEditingId] = useState(null);
   const [editingText, setEditingText] = useState('');
@@ -52,10 +54,27 @@ export default function UserDashboardPage() {
     const loadUserComments = async () => {
       setIsLoadingComments(true);
       try {
-        await new Promise((resolve) => setTimeout(resolve, 250));
+        const res = await api.get('/articles/user/my-comments');
         if (!isMounted) return;
-        setMyComments(INITIAL_USER_COMMENTS);
+
+        const rawComments = res.data?.data || res.data || [];
+        const normalizedComments = Array.isArray(rawComments)
+          ? rawComments.map((item) => ({
+              id: item.id,
+              article_id: item.article_id,
+              article_slug: item.article_slug || item.slug || String(item.article_id),
+              article_title: item.article_title || item.title || 'Artikel',
+              content: item.content,
+              time_ago: item.is_edited
+                ? `Diedit • ${formatRelativeOrDate(item.updated_at || item.created_at)}`
+                : formatRelativeOrDate(item.created_at),
+            }))
+          : [];
+
+        setMyComments(normalizedComments);
+        setTotalCommentsCount(normalizedComments.length);
       } catch (err) {
+        if (!isMounted) return;
         if (err.response?.status === 401) {
           await logout();
           navigate('/login', { replace: true });
@@ -65,14 +84,43 @@ export default function UserDashboardPage() {
       }
     };
 
+    const loadRecommendedArticles = async () => {
+      setIsLoadingArticles(true);
+      try {
+        const res = await api.get('/articles', { params: { limit: 3 } });
+        if (!isMounted) return;
+
+        const rawArticles = res.data?.data || res.data || [];
+        const normalizedArticles = Array.isArray(rawArticles)
+          ? rawArticles.slice(0, 3).map((item) => ({
+              ...item,
+              slug: item.slug || String(item.id),
+              category: item.category || 'Umum',
+              image_url: item.image_url || item.thumbnail || '',
+              excerpt: item.excerpt || item.content?.slice(0, 140) || '',
+              author_name: item.author_name || item.author || 'Admin PosTera',
+              published_at: item.published_at || item.created_at,
+            }))
+          : [];
+
+        setRecommendedArticles(normalizedArticles);
+      } catch {
+        if (isMounted) setRecommendedArticles([]);
+      } finally {
+        if (isMounted) setIsLoadingArticles(false);
+      }
+    };
+
     loadUserComments();
+    loadRecommendedArticles();
+
     return () => {
       isMounted = false;
     };
   }, [logout, navigate]);
 
   const formatJoinDate = (createdAt) => {
-    if (!createdAt) return '12 Okt 2026';
+    if (!createdAt) return '-';
     const parsed = new Date(createdAt);
     if (Number.isNaN(parsed.getTime())) return createdAt;
     return parsed.toLocaleDateString('id-ID', {
@@ -98,6 +146,8 @@ export default function UserDashboardPage() {
 
     setIsSavingEdit(true);
     try {
+      await api.put(`/articles/comments/${commentId}`, { content: trimmed });
+
       setMyComments((prev) =>
         prev.map((item) =>
           item.id === commentId
@@ -122,6 +172,8 @@ export default function UserDashboardPage() {
 
     setIsDeleting(true);
     try {
+      await api.delete(`/articles/comments/${deleteTargetId}`);
+
       setMyComments((prev) => prev.filter((item) => item.id !== deleteTargetId));
       setTotalCommentsCount((prev) => Math.max(0, prev - 1));
       setDeleteTargetId(null);
@@ -136,7 +188,7 @@ export default function UserDashboardPage() {
   };
 
   const displayedComments = showAllComments ? myComments : myComments.slice(0, 5);
-  const displayName = user?.name || 'Ragil Bayu';
+  const displayName = user?.name || 'Mahasiswa';
   const joinDateText = formatJoinDate(user?.created_at);
 
   return (
@@ -190,7 +242,7 @@ export default function UserDashboardPage() {
         <section className="bg-white rounded-[10px] p-5.5 shadow-[0_2px_12px_rgba(0,0,0,0.08)]">
           <div className="flex items-center justify-between mb-2.5">
             <h2 className="text-lg font-bold text-[#1F2937]">Komentar Saya</h2>
-            {myComments.length > 0 && (
+            {myComments.length > 5 && (
               <button
                 type="button"
                 onClick={() => setShowAllComments((prev) => !prev)}
@@ -278,7 +330,6 @@ export default function UserDashboardPage() {
                         </div>
                       ) : (
                         <>
-                          {/* Teks komentar dirender sebagai teks biasa aman (SR-INP-03) */}
                           <p className="mt-1 text-sm leading-normal text-[#1F2937] wrap-break-word">
                             {comment.content}
                           </p>
@@ -289,7 +340,6 @@ export default function UserDashboardPage() {
                       )}
                     </div>
 
-                    {/* Aksi Edit & Hapus (di kanan pada desktop >= 900px, pindah ke bawah isi komentar pada < 900px) */}
                     {!isEditing && (
                       <div className="flex items-center gap-3.5 shrink-0">
                         <button
@@ -328,16 +378,31 @@ export default function UserDashboardPage() {
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {MOCK_ARTICLES.slice(0, 3).map((article) => (
-              <ArticleCard
-                key={article.id}
-                article={article}
-                isFeatured={false}
-                compactCover={true}
-              />
-            ))}
-          </div>
+          {isLoadingArticles ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {[1, 2, 3].map((item) => (
+                <div
+                  key={item}
+                  className="h-64 bg-white rounded-[10px] p-4 shadow-[0_2px_12px_rgba(0,0,0,0.08)] animate-pulse"
+                />
+              ))}
+            </div>
+          ) : recommendedArticles.length === 0 ? (
+            <div className="bg-white rounded-[10px] p-8 text-center text-sm text-[#4B5563] shadow-[0_2px_12px_rgba(0,0,0,0.08)]">
+              Belum ada artikel yang tersedia saat ini.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {recommendedArticles.map((article) => (
+                <ArticleCard
+                  key={article.id}
+                  article={article}
+                  isFeatured={false}
+                  compactCover={true}
+                />
+              ))}
+            </div>
+          )}
         </section>
 
         <Footer />

@@ -7,6 +7,12 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import UserDashboardPage from './pages/UserDashboardPage';
 import AdminDashboardPage from './pages/AdminDashboardPage';
+import AdminArticlesPage from './pages/AdminArticlesPage';
+import AdminArticleCreatePage from './pages/AdminArticleCreatePage';
+import AdminArticleEditPage from './pages/AdminArticleEditPage';
+import AdminUsersPage from './pages/AdminUsersPage';
+import AdminCommentsPage from './pages/AdminCommentsPage';
+import AdminAuditLogsPage from './pages/AdminAuditLogsPage';
 import VerifyOtpPage from './pages/VerifyOtpPage';
 
 const ProtectedRoute = ({ children, allowedRole }) => {
@@ -38,7 +44,8 @@ const GuestRoute = ({ children }) => {
   if (loading) return null;
 
   if (user) {
-    return <Navigate to="/" replace />;
+    const target = user.role === 'admin' ? '/admin/dashboard' : '/';
+    return <Navigate to={target} replace />;
   }
 
   return children;
@@ -85,10 +92,66 @@ export default function App() {
             }
           />
           <Route
+            path="/admin"
+            element={
+              <ProtectedRoute allowedRole="admin">
+                <AdminDashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/admin/dashboard"
             element={
               <ProtectedRoute allowedRole="admin">
                 <AdminDashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/articles"
+            element={
+              <ProtectedRoute allowedRole="admin">
+                <AdminArticlesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/articles/new"
+            element={
+              <ProtectedRoute allowedRole="admin">
+                <AdminArticleCreatePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/articles/:id/edit"
+            element={
+              <ProtectedRoute allowedRole="admin">
+                <AdminArticleEditPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/users"
+            element={
+              <ProtectedRoute allowedRole="admin">
+                <AdminUsersPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/comments"
+            element={
+              <ProtectedRoute allowedRole="admin">
+                <AdminCommentsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/audit-logs"
+            element={
+              <ProtectedRoute allowedRole="admin">
+                <AdminAuditLogsPage />
               </ProtectedRoute>
             }
           />

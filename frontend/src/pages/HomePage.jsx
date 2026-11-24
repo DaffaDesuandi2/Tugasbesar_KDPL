@@ -1,13 +1,42 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import ArticleCard from '../components/ArticleCard';
 import Footer from '../components/Footer';
-import { CATEGORIES, MOCK_ARTICLES } from '../data/mockArticles';
+import api from '../api/axios';
+
+const CATEGORIES = ['Semua', 'Akademik', 'Kemahasiswaan', 'Beasiswa', 'Kompetisi', 'Pengumuman'];
 
 export default function HomePage() {
   const [searchInput, setSearchInput] = useState('');
+  const [articles, setArticles] = useState([]);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchLatestArticles = async () => {
+      setLoading(true);
+      try {
+        const res = await api.get('/api/articles', {
+          params: { page: 1, limit: 6 },
+        });
+        if (!isMounted) return;
+        setArticles(Array.isArray(res.data?.articles) ? res.data.articles : []);
+      } catch {
+        if (isMounted) setArticles([]);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    fetchLatestArticles();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
@@ -89,15 +118,37 @@ export default function HomePage() {
         </section>
 
         <section aria-label="Daftar Artikel Terbaru">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {MOCK_ARTICLES.slice(0, 6).map((article, index) => (
-              <ArticleCard
-                key={article.id}
-                article={article}
-                isFeatured={index === 0}
-              />
-            ))}
-          </div>
+          {loading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {Array.from({ length: 6 }).map((_, idx) => (
+                <div
+                  key={idx}
+                  className="bg-white rounded-xl p-3 shadow-[0_2px_12px_rgba(0,0,0,0.08)] flex flex-col gap-3"
+                >
+                  <div className="h-37.5 rounded-lg bg-gray-200 animate-pulse" />
+                  <div className="h-5 w-3/4 bg-gray-200 rounded animate-pulse" />
+                  <div className="h-9 w-full bg-gray-200 rounded animate-pulse" />
+                  <div className="h-4 w-1/2 bg-gray-200 rounded animate-pulse" />
+                </div>
+              ))}
+            </div>
+          ) : articles.length === 0 ? (
+            <div className="max-w-md mx-auto bg-white rounded-xl p-8 text-center shadow-[0_2px_12px_rgba(0,0,0,0.08)]">
+              <p className="text-[15px] font-semibold text-[#1F2937]">
+                Belum ada artikel yang dipublikasikan.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {articles.map((article, index) => (
+                <ArticleCard
+                  key={article.id}
+                  article={article}
+                  isFeatured={index === 0}
+                />
+              ))}
+            </div>
+          )}
 
           <div className="mt-7 flex justify-center">
             <Link

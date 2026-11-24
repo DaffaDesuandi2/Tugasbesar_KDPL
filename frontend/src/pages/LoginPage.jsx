@@ -25,13 +25,14 @@ export default function LoginPage() {
 
     try {
       const data = await login(email, password);
+      const loggedInUser = data?.user || data;
       const redirectParam = searchParams.get('redirect');
       const safeRedirect =
         redirectParam && redirectParam.startsWith('/') && !redirectParam.startsWith('//')
           ? redirectParam
           : '/';
 
-      if (data?.user?.role === 'admin') {
+      if (loggedInUser?.role === 'admin') {
         navigate('/admin/dashboard', { replace: true });
       } else {
         navigate(safeRedirect, { replace: true });

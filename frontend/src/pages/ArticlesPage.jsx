@@ -1,10 +1,12 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import ArticleCard from '../components/ArticleCard';
 import Pagination from '../components/Pagination';
 import Footer from '../components/Footer';
-import { CATEGORIES, MOCK_ARTICLES } from '../data/mockArticles';
+import api from '../api/axios';
+
+const CATEGORIES = ['Semua', 'Akademik', 'Kemahasiswaan', 'Beasiswa', 'Kompetisi', 'Pengumuman'];
 
 export default function ArticlesPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -13,31 +15,57 @@ export default function ArticlesPage() {
   const currentPage = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
 
   const [searchInput, setSearchInput] = useState(querySearch);
+  const [articles, setArticles] = useState([]);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
     setSearchInput(querySearch);
   }, [querySearch]);
 
-  const filteredArticles = useMemo(() => {
-    return MOCK_ARTICLES.filter((item) => {
-      const matchCategory =
-        queryCategory === 'Semua' ||
-        item.category.toLowerCase() === queryCategory.toLowerCase();
-      const keyword = querySearch.trim().toLowerCase();
-      const matchSearch =
-        !keyword ||
-        item.title.toLowerCase().includes(keyword) ||
-        item.excerpt.toLowerCase().includes(keyword);
-      return matchCategory && matchSearch;
-    });
-  }, [querySearch, queryCategory]);
+  useEffect(() => {
+    let isMounted = true;
 
-  const perPage = 9;
-  const totalPages = Math.max(1, Math.ceil(filteredArticles.length / perPage));
-  const paginatedArticles = filteredArticles.slice(
-    (currentPage - 1) * perPage,
-    currentPage * perPage
-  );
+    const fetchArticles = async () => {
+      setLoading(true);
+      setErrorMsg('');
+
+      try {
+        const params = {
+          page: currentPage,
+          limit: 9,
+        };
+        if (querySearch.trim()) {
+          params.search = querySearch.trim();
+        }
+        if (queryCategory && queryCategory !== 'Semua') {
+          params.category = queryCategory.toLowerCase();
+        }
+
+        const res = await api.get('/api/articles', { params });
+        if (!isMounted) return;
+
+        setArticles(Array.isArray(res.data?.articles) ? res.data.articles : []);
+        setTotalPages(Math.max(1, res.data?.totalPages || 1));
+      } catch (err) {
+        if (!isMounted) return;
+        setArticles([]);
+        setTotalPages(1);
+        setErrorMsg(err.message || 'Gagal memuat daftar artikel.');
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchArticles();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [querySearch, queryCategory, currentPage]);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
@@ -107,7 +135,7 @@ export default function ArticlesPage() {
 
           <div className="flex flex-wrap items-center justify-center gap-2 mt-1">
             {CATEGORIES.map((category) => {
-              const isActive = queryCategory === category;
+              const isActive = queryCategory.toLowerCase() === category.toLowerCase();
               return (
                 <button
                   key={category}
@@ -127,7 +155,25 @@ export default function ArticlesPage() {
         </section>
 
         <section>
-          {paginatedArticles.length === 0 ? (
+          {loading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {Array.from({ length: 6 }).map((_, idx) => (
+                <div
+                  key={idx}
+                  className="bg-white rounded-xl p-3 shadow-[0_2px_12px_rgba(0,0,0,0.08)] flex flex-col gap-3"
+                >
+                  <div className="h-37.5 rounded-lg bg-gray-200 animate-pulse" />
+                  <div className="h-5 w-3/4 bg-gray-200 rounded animate-pulse" />
+                  <div className="h-9 w-full bg-gray-200 rounded animate-pulse" />
+                  <div className="h-4 w-1/2 bg-gray-200 rounded animate-pulse" />
+                </div>
+              ))}
+            </div>
+          ) : errorMsg ? (
+            <div className="max-w-md mx-auto bg-white rounded-xl p-8 text-center shadow-[0_2px_12px_rgba(0,0,0,0.08)]">
+              <p className="text-[15px] font-semibold text-red-600">{errorMsg}</p>
+            </div>
+          ) : articles.length === 0 ? (
             <div className="max-w-md mx-auto bg-white rounded-xl p-8 text-center shadow-[0_2px_12px_rgba(0,0,0,0.08)]">
               <p className="text-[15px] font-semibold text-[#1F2937]">
                 Tidak ada artikel yang cocok. Coba kata kunci lain.
@@ -135,7 +181,7 @@ export default function ArticlesPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {paginatedArticles.map((article, index) => (
+              {articles.map((article, index) => (
                 <ArticleCard
                   key={article.id}
                   article={article}

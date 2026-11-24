@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 
+const EMAIL_CAMPUS_REGEX = /^[a-z0-9._%+-]+@(student\.)?itera\.ac\.id$/i;
+
 export default function RegisterPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -21,10 +23,17 @@ export default function RegisterPage() {
 
   const validateClientSide = () => {
     const newErrors = {};
+    const cleanName = formData.name.trim();
+    const cleanEmail = formData.email.trim().toLowerCase();
 
-    if (formData.name.trim().length < 2) {
-      newErrors.name = 'Nama minimal 2 karakter.';
+    if (cleanName.length < 2 || cleanName.length > 100) {
+      newErrors.name = 'Nama wajib diisi 2–100 karakter.';
     }
+
+    if (!cleanEmail || !EMAIL_CAMPUS_REGEX.test(cleanEmail)) {
+      newErrors.email = 'Format email tidak valid. Gunakan email resmi sivitas akademika ITERA (@student.itera.ac.id).';
+    }
+
     if (formData.password.length < 8) {
       newErrors.password = 'Password minimal 8 karakter.';
     } else if (!/[A-Z]/.test(formData.password)) {
@@ -38,6 +47,7 @@ export default function RegisterPage() {
     if (formData.password !== formData.password_confirmation) {
       newErrors.password_confirmation = 'Konfirmasi password tidak cocok.';
     }
+
     return newErrors;
   };
 
@@ -60,12 +70,13 @@ export default function RegisterPage() {
       return;
     }
 
+    const cleanName = formData.name.trim();
     const cleanEmail = formData.email.trim().toLowerCase();
     setIsSubmitting(true);
 
     try {
       await api.post('/api/auth/send-otp', {
-        name: formData.name.trim(),
+        name: cleanName,
         email: cleanEmail,
       });
 
@@ -73,6 +84,7 @@ export default function RegisterPage() {
         state: {
           registrationData: {
             ...formData,
+            name: cleanName,
             email: cleanEmail,
           },
         },
@@ -83,11 +95,14 @@ export default function RegisterPage() {
 
       if (status === 409) {
         setErrors({ email: detail || 'Email sudah terdaftar.' });
+      } else if (status === 400) {
+        setErrors({ email: detail || 'Format email tidak valid.' });
       } else if (status === 404) {
         navigate('/verify-otp', {
           state: {
             registrationData: {
               ...formData,
+              name: cleanName,
               email: cleanEmail,
             },
           },
@@ -110,7 +125,6 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen bg-[#F3F4F6] flex items-center justify-center p-4">
       <div className="w-full max-w-225 bg-[#FFFFFF] rounded-[10px] shadow-[0_2px_12px_rgba(0,0,0,0.08)] overflow-hidden flex flex-col md:flex-row">
-        
         <div className="w-full md:w-75 shrink-0 bg-[#0C4A6E] px-6 py-5 md:py-10 md:px-8 flex flex-col justify-start">
           <div className="text-[24px] font-bold text-white leading-tight">
             PosTera
@@ -132,7 +146,7 @@ export default function RegisterPage() {
             Daftar Akun PosTera
           </h1>
           <p className="text-[14px] font-normal text-[#4B5563] mt-1 mb-6">
-            Portal Artikel & Diskusi Mahasiswa Kampus
+            Gunakan email resmi mahasiswa ITERA (@student.itera.ac.id)
           </p>
 
           {generalError && (
@@ -163,7 +177,7 @@ export default function RegisterPage() {
 
             <div>
               <label htmlFor="reg-email" className="block text-[14px] font-semibold text-[#1F2937] mb-1.5">
-                Email Kampus / Aktif
+                Email Mahasiswa ITERA
               </label>
               <input
                 id="reg-email"

@@ -1,36 +1,140 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import ArticleCard from '../components/ArticleCard';
 import Footer from '../components/Footer';
 import { useAuth } from '../context/AuthContext';
-import { MOCK_ARTICLES, MOCK_COMMENTS } from '../data/mockArticles';
+import api from '../api/axios';
+
+function formatIndonesianDate(isoString) {
+  if (!isoString) return '';
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('id-ID', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
+function formatRelativeTime(isoString, isEdited = false) {
+  if (!isoString) return isEdited ? 'Diedit baru saja' : 'Baru saja';
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime())) return '';
+
+  const diffSeconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
+  const prefix = isEdited ? 'Diedit ' : '';
+
+  if (diffSeconds < 60) return `${prefix}baru saja`;
+  const diffMinutes = Math.floor(diffSeconds / 60);
+  if (diffMinutes < 60) return `${prefix}${diffMinutes} menit lalu`;
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${prefix}${diffHours} jam lalu`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${prefix}${diffDays} hari lalu`;
+
+  return `${prefix}${formatIndonesianDate(isoString)}`;
+}
+
+function normalizeArticle(raw) {
+  if (!raw) return null;
+  const paragraphs =
+    Array.isArray(raw.paragraphs) && raw.paragraphs.length > 0
+      ? raw.paragraphs
+      : (raw.description || '')
+          .split(/\n{2,}/)
+          .map((p) => p.trim())
+          .filter(Boolean);
+
+  return {
+    ...raw,
+    slug: raw.slug || String(raw.id),
+    published_date: raw.published_date || formatIndonesianDate(raw.created_at),
+    paragraphs: paragraphs.length > 0 ? paragraphs : [raw.description || ''],
+  };
+}
 
 export default function ArticleDetailPage() {
   const { slug } = useParams();
   const { user } = useAuth();
 
-  const article = useMemo(
-    () => MOCK_ARTICLES.find((item) => item.slug === slug),
-    [slug]
-  );
+  const articleId = slug ? slug.split('-')[0] : '';
 
-  const [comments, setComments] = useState(() =>
-    MOCK_COMMENTS.filter((c) => c.article_slug === slug)
-  );
+  const [article, setArticle] = useState(null);
+  const [comments, setComments] = useState([]);
+  const [relatedArticles, setRelatedArticles] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+
   const [showAllComments, setShowAllComments] = useState(false);
-
   const [newComment, setNewComment] = useState('');
+  const [submittingComment, setSubmittingComment] = useState(false);
+  const [commentError, setCommentError] = useState('');
+
   const [editingId, setEditingId] = useState(null);
   const [editingText, setEditingText] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
 
-  const relatedArticles = useMemo(() => {
-    if (!article) return [];
-    const others = MOCK_ARTICLES.filter((item) => item.id !== article.id);
-    const sameCategory = others.filter((item) => item.category === article.category);
-    const diffCategory = others.filter((item) => item.category !== article.category);
-    return [...sameCategory, ...diffCategory].slice(0, 3);
-  }, [article]);
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchArticleDetail = async () => {
+      setLoading(true);
+      setNotFound(false);
+      setCommentError('');
+      setShowAllComments(false);
+
+      try {
+        const res = await api.get(`/api/articles/${encodeURIComponent(articleId)}`);
+        if (!isMounted) return;
+
+        const fetchedArticle = normalizeArticle(res.data?.article);
+        if (!fetchedArticle) {
+          setNotFound(true);
+          setArticle(null);
+          return;
+        }
+
+        setArticle(fetchedArticle);
+        setComments(Array.isArray(res.data?.comments) ? res.data.comments : []);
+
+        try {
+          const listRes = await api.get('/api/articles', { params: { limit: 6 } });
+          if (!isMounted) return;
+          const allItems = Array.isArray(listRes.data?.articles)
+            ? listRes.data.articles.map(normalizeArticle)
+            : [];
+          const others = allItems.filter((item) => item.id !== fetchedArticle.id);
+          const sameCategory = others.filter((item) => item.category === fetchedArticle.category);
+          const diffCategory = others.filter((item) => item.category !== fetchedArticle.category);
+          setRelatedArticles([...sameCategory, ...diffCategory].slice(0, 3));
+        } catch {
+          if (isMounted) setRelatedArticles([]);
+        }
+      } catch (err) {
+        if (!isMounted) return;
+        if (err.response?.status === 404) {
+          setNotFound(true);
+        }
+        setArticle(null);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    if (articleId) {
+      fetchArticleDetail();
+    } else {
+      setNotFound(true);
+      setLoading(false);
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [articleId]);
 
   const getInitials = (name) => {
     if (!name) return 'U';
@@ -42,7 +146,22 @@ export default function ArticleDetailPage() {
       .join('');
   };
 
-  if (!article) {
+  if (loading) {
+    return (
+      <div className="min-h-screen flex flex-col bg-gray-100">
+        <Navbar />
+        <main className="flex-1 w-full max-w-190 mx-auto px-4 md:px-0 pt-8 pb-12 flex flex-col gap-5">
+          <div className="h-6 w-36 bg-gray-200 rounded animate-pulse" />
+          <div className="h-10 w-3/4 bg-gray-200 rounded animate-pulse" />
+          <div className="h-50 w-full bg-gray-200 rounded-[14px] animate-pulse" />
+          <div className="h-32 w-full bg-gray-200 rounded-xl animate-pulse" />
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (notFound || !article) {
     return (
       <div className="min-h-screen flex flex-col bg-gray-100">
         <Navbar />
@@ -73,42 +192,77 @@ export default function ArticleDetailPage() {
   const visibleComments = showAllComments ? comments : comments.slice(0, 4);
   const initialTitleLetter = article.title.trim().charAt(0).toUpperCase();
 
-  const handleAddComment = (e) => {
+  const handleAddComment = async (e) => {
     e.preventDefault();
     const trimmed = newComment.trim().slice(0, 500);
-    if (!trimmed || !user) return;
+    if (!trimmed || !user || submittingComment) return;
 
-    const created = {
-      id: Date.now(),
-      article_slug: article.slug,
-      user_id: user.id,
-      author_name: user.name,
-      time_ago: 'Baru saja',
-      content: trimmed,
-    };
-    setComments([created, ...comments]);
-    setNewComment('');
+    setSubmittingComment(true);
+    setCommentError('');
+
+    try {
+      const res = await api.post(`/api/articles/${article.id}/comments`, {
+        content: trimmed,
+      });
+      const created = {
+        ...res.data,
+        author_name: res.data?.author_name || user.name,
+      };
+      setComments([created, ...comments]);
+      setNewComment('');
+    } catch (err) {
+      setCommentError(err.message || 'Gagal menambahkan komentar.');
+    } finally {
+      setSubmittingComment(false);
+    }
   };
 
   const handleStartEdit = (comment) => {
     setEditingId(comment.id);
     setEditingText(comment.content);
+    setCommentError('');
   };
 
-  const handleSaveEdit = (id) => {
+  const handleSaveEdit = async (id) => {
     const trimmed = editingText.trim().slice(0, 500);
-    if (!trimmed) return;
-    setComments(
-      comments.map((item) =>
-        item.id === id ? { ...item, content: trimmed, time_ago: 'Diedit baru saja' } : item
-      )
-    );
-    setEditingId(null);
-    setEditingText('');
+    if (!trimmed || savingEdit) return;
+
+    setSavingEdit(true);
+    setCommentError('');
+
+    try {
+      const res = await api.put(`/api/articles/comments/${id}`, {
+        content: trimmed,
+      });
+      setComments(
+        comments.map((item) =>
+          item.id === id
+            ? {
+                ...item,
+                content: res.data?.content || trimmed,
+                updated_at: res.data?.updated_at || new Date().toISOString(),
+                is_edited: true,
+              }
+            : item
+        )
+      );
+      setEditingId(null);
+      setEditingText('');
+    } catch (err) {
+      setCommentError(err.message || 'Gagal memperbarui komentar.');
+    } finally {
+      setSavingEdit(false);
+    }
   };
 
-  const handleDeleteComment = (id) => {
-    setComments(comments.filter((item) => item.id !== id));
+  const handleDeleteComment = async (id) => {
+    setCommentError('');
+    try {
+      await api.delete(`/api/articles/comments/${id}`);
+      setComments(comments.filter((item) => item.id !== id));
+    } catch (err) {
+      setCommentError(err.message || 'Gagal menghapus komentar.');
+    }
   };
 
   return (
@@ -145,11 +299,21 @@ export default function ArticleDetailPage() {
         </header>
 
         <article className="flex flex-col gap-5.5">
-          <div className="w-full h-50 rounded-[14px] bg-[#BAE6FD] flex items-center justify-center select-none">
-            <span className="text-[84px] font-extrabold leading-none text-[#0C4A6E]">
-              {initialTitleLetter}
-            </span>
-          </div>
+          {article.image_url ? (
+            <div className="w-full h-64 md:h-80 rounded-[14px] overflow-hidden bg-[#BAE6FD]">
+              <img
+                src={article.image_url}
+                alt={article.title}
+                className="w-full h-full object-cover"
+              />
+            </div>
+          ) : (
+            <div className="w-full h-50 rounded-[14px] bg-[#BAE6FD] flex items-center justify-center select-none">
+              <span className="text-[84px] font-extrabold leading-none text-[#0C4A6E]">
+                {initialTitleLetter}
+              </span>
+            </div>
+          )}
 
           <div className="flex flex-col gap-5.5 text-base leading-[1.85] text-[#1F2937]">
             {article.paragraphs.map((paragraph, index) => (
@@ -166,6 +330,12 @@ export default function ArticleDetailPage() {
           <h2 className="text-[22px] font-bold text-[#1F2937]">
             Komentar ({comments.length})
           </h2>
+
+          {commentError && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {commentError}
+            </div>
+          )}
 
           {!user ? (
             <div className="bg-[#E0F2FE] rounded-xl px-6.5 py-5.5 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -233,10 +403,10 @@ export default function ArticleDetailPage() {
                 </span>
                 <button
                   type="submit"
-                  disabled={!newComment.trim()}
+                  disabled={!newComment.trim() || submittingComment}
                   className="px-5.5 py-2 rounded-full bg-[#0369A1] text-white text-sm font-semibold hover:bg-[#0C4A6E] disabled:opacity-50 transition-colors cursor-pointer"
                 >
-                  Kirim Komentar
+                  {submittingComment ? 'Mengirim...' : 'Kirim Komentar'}
                 </button>
               </div>
             </form>
@@ -245,6 +415,14 @@ export default function ArticleDetailPage() {
           <div className="flex flex-col gap-5.5">
             {visibleComments.map((comment) => {
               const isOwner = user && user.id === comment.user_id;
+              const isEdited =
+                Boolean(comment.is_edited) ||
+                (comment.updated_at &&
+                  comment.created_at &&
+                  new Date(comment.updated_at).getTime() - new Date(comment.created_at).getTime() > 2000);
+              const displayTime =
+                comment.time_ago ||
+                formatRelativeTime(isEdited ? comment.updated_at : comment.created_at, isEdited);
 
               return (
                 <div
@@ -267,7 +445,7 @@ export default function ArticleDetailPage() {
                           </span>
                         )}
                         <span className="text-xs text-[#4B5563] ml-2">
-                          {comment.time_ago}
+                          {displayTime}
                         </span>
                       </div>
 
@@ -300,21 +478,27 @@ export default function ArticleDetailPage() {
                           onChange={(e) => setEditingText(e.target.value)}
                           className="w-full rounded-lg border border-gray-300 p-2.5 text-sm text-[#1F2937] outline-none focus:border-[#0369A1]"
                         />
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setEditingId(null)}
-                            className="px-3 py-1 rounded-full border border-gray-300 text-xs font-semibold text-[#4B5563] cursor-pointer"
-                          >
-                            Batal
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleSaveEdit(comment.id)}
-                            className="px-3.5 py-1 rounded-full bg-[#0369A1] text-white text-xs font-semibold cursor-pointer"
-                          >
-                            Simpan
-                          </button>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs text-[#4B5563]">
+                            {editingText.length}/500
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setEditingId(null)}
+                              className="px-3 py-1 rounded-full border border-gray-300 text-xs font-semibold text-[#4B5563] cursor-pointer"
+                            >
+                              Batal
+                            </button>
+                            <button
+                              type="button"
+                              disabled={!editingText.trim() || savingEdit}
+                              onClick={() => handleSaveEdit(comment.id)}
+                              className="px-3.5 py-1 rounded-full bg-[#0369A1] text-white text-xs font-semibold disabled:opacity-50 cursor-pointer"
+                            >
+                              {savingEdit ? 'Menyimpan...' : 'Simpan'}
+                            </button>
+                          </div>
                         </div>
                       </div>
                     ) : (
@@ -341,28 +525,30 @@ export default function ArticleDetailPage() {
           )}
         </section>
 
-        <section aria-label="Artikel Lainnya" className="pt-2 flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-[22px] font-bold text-[#1F2937]">Artikel Lainnya</h2>
-            <Link
-              to="/artikel"
-              className="text-sm font-semibold text-[#0369A1] hover:text-[#0C4A6E] transition-colors"
-            >
-              Lihat semua
-            </Link>
-          </div>
+        {relatedArticles.length > 0 && (
+          <section aria-label="Artikel Lainnya" className="pt-2 flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-[22px] font-bold text-[#1F2937]">Artikel Lainnya</h2>
+              <Link
+                to="/artikel"
+                className="text-sm font-semibold text-[#0369A1] hover:text-[#0C4A6E] transition-colors"
+              >
+                Lihat semua
+              </Link>
+            </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {relatedArticles.map((item) => (
-              <ArticleCard
-                key={item.id}
-                article={item}
-                isFeatured={false}
-                compactCover={true}
-              />
-            ))}
-          </div>
-        </section>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              {relatedArticles.map((item) => (
+                <ArticleCard
+                  key={item.id}
+                  article={item}
+                  isFeatured={false}
+                  compactCover={true}
+                />
+              ))}
+            </div>
+          </section>
+        )}
 
         <Footer />
       </main>
