@@ -12,6 +12,7 @@ dist/
 dist-ssr/
 *.log
 *.local
+.vite/
 
 # OS & Editor
 .DS_Store
