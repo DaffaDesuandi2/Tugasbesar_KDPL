@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import AdminLayout from '../components/AdminLayout';
-import api from '../api/axios';
 
 const CATEGORIES = [
   { label: 'Umum', value: 'umum' },
@@ -215,10 +214,10 @@ export default function AdminArticleEditPage() {
       }
 
       try {
-        const response = await api.get(`/api/admin/articles/${numericId}`);
+        await new Promise((resolve) => setTimeout(resolve, 250));
         if (!isMounted) return;
 
-        const found = response.data;
+        const found = MOCK_ARTICLES_DB[numericId];
         if (!found) {
           setNotFound(true);
           return;
@@ -226,37 +225,33 @@ export default function AdminArticleEditPage() {
 
         const initialImageState = {
           previewUrl: found.image_url || '',
-          name: `sampul-artikel-${found.id}.jpg`,
-          meta: 'Sampul Artikel',
+          name: found.image_name || `sampul-artikel-${found.id}.jpg`,
+          meta: found.image_meta || '184 KB · JPG',
           isObjectUrl: false,
           isExisting: true,
         };
 
-        const catValue = (found.category || 'umum').toLowerCase();
-        const validCat = CATEGORIES.some((c) => c.value === catValue) ? catValue : 'umum';
-
-        setTitle(found.title || '');
-        setCategory(validCat);
-        setStatus(found.status || 'published');
-        setDescription(found.description || '');
+        setTitle(found.title);
+        setCategory(found.category);
+        setStatus(found.status);
+        setDescription(found.description);
         setCurrentImage(initialImageState);
         setImageUrlInput(found.image_url || '');
         setArticleMeta({
           id: found.id,
-          author_name: found.author_name || 'Admin PosTera',
-          created_at: found.created_at ? new Date(found.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '',
-          updated_at: found.updated_at ? new Date(found.updated_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '',
+          author_name: found.author_name,
+          created_at: found.created_at,
+          updated_at: found.updated_at,
         });
 
         setInitialData({
-          title: found.title || '',
-          category: validCat,
-          status: found.status || 'published',
-          description: found.description || '',
+          title: found.title,
+          category: found.category,
+          status: found.status,
+          description: found.description,
           imageKey: initialImageState.name,
         });
-      } catch (err) {
-        console.error('Gagal memuat artikel:', err);
+      } catch {
         if (isMounted) setNotFound(true);
       } finally {
         if (isMounted) setIsLoading(false);
@@ -419,27 +414,7 @@ export default function AdminArticleEditPage() {
 
     setIsSubmitting(true);
     try {
-      let finalImageUrl = imageUrlInput.trim();
-      if (coverTab === 'upload' && currentImage?.rawFile) {
-        finalImageUrl = await new Promise((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result);
-          reader.onerror = () => resolve('');
-          reader.readAsDataURL(currentImage.rawFile);
-        });
-      } else if (!finalImageUrl && currentImage?.previewUrl) {
-        finalImageUrl = currentImage.previewUrl;
-      }
-
-      const selectedCategory = CATEGORIES.find((c) => c.value === category)?.label || 'Umum';
-
-      await api.put(`/api/admin/articles/${id}`, {
-        title: title.trim(),
-        category: selectedCategory,
-        description: description.trim(),
-        status,
-        image_url: finalImageUrl || 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=800',
-      });
+      await new Promise((resolve) => setTimeout(resolve, 400));
 
       const isArchivedNow =
         initialData?.status !== 'archived' && status === 'archived';
@@ -452,11 +427,10 @@ export default function AdminArticleEditPage() {
             : 'Perubahan disimpan',
         },
       });
-    } catch (err) {
-      console.error('Gagal memperbarui artikel:', err);
+    } catch {
       setErrors((prev) => ({
         ...prev,
-        submit: err.response?.data?.detail || 'Gagal menyimpan perubahan. Coba lagi.',
+        submit: 'Gagal menyimpan perubahan. Coba lagi.',
       }));
     } finally {
       setIsSubmitting(false);

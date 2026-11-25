@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import AdminLayout from '../components/AdminLayout';
-import api from '../api/axios';
 
 const ACTION_OPTIONS = [
   'Semua',
@@ -178,13 +177,10 @@ export default function AdminAuditLogsPage() {
       setIsLoading(true);
       setHasError(false);
       try {
-        const response = await api.get('/api/admin/audit-logs', {
-          params: { limit: 100 }
-        });
+        await new Promise((resolve) => setTimeout(resolve, 250));
         if (!isMounted) return;
-        setLogs(response.data.logs || []);
-      } catch (err) {
-        console.error('Gagal memuat audit logs:', err);
+        setLogs(INITIAL_AUDIT_LOGS);
+      } catch {
         if (isMounted) setHasError(true);
       } finally {
         if (isMounted) setIsLoading(false);

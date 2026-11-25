@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import AdminLayout from '../components/AdminLayout';
-import api from '../api/axios';
 
 const INITIAL_COMMENTS = [
   {
@@ -86,13 +85,10 @@ export default function AdminCommentsPage() {
       setIsLoading(true);
       setHasError(false);
       try {
-        const response = await api.get('/api/admin/comments', {
-          params: { limit: 100 }
-        });
+        await new Promise((resolve) => setTimeout(resolve, 250));
         if (!isMounted) return;
-        setComments(response.data.comments || []);
-      } catch (err) {
-        console.error('Gagal memuat komentar admin:', err);
+        setComments(INITIAL_COMMENTS);
+      } catch {
         if (isMounted) setHasError(true);
       } finally {
         if (isMounted) setIsLoading(false);
@@ -141,7 +137,7 @@ export default function AdminCommentsPage() {
 
     setIsDeleting(true);
     try {
-      await api.delete(`/api/admin/comments/${deleteTarget.id}`);
+      await new Promise((resolve) => setTimeout(resolve, 300));
 
       setComments((prev) => prev.filter((item) => item.id !== deleteTarget.id));
       setDeleteTarget(null);
@@ -149,8 +145,7 @@ export default function AdminCommentsPage() {
         message: 'Komentar dihapus',
         variant: 'default',
       });
-    } catch (err) {
-      console.error('Gagal menghapus komentar:', err);
+    } catch {
       setDeleteTarget(null);
       setToast({
         message: 'Gagal menghapus komentar. Coba lagi.',
