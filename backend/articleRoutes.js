@@ -15,6 +15,7 @@ import {
   listPublicArticles,
   updateArticle
 } from './controllers/articleController.js';
+import { getClientIp, recordAuditLog } from './utils/auditLog.js';
 
 export const articleRouter = Router();
 
@@ -105,7 +106,7 @@ articleRouter.post('/:id/comments', authenticateUser, validateArticleIdParam, as
 
   try {
     const articleCheck = await pool.query(
-      "SELECT id FROM articles WHERE id = $1 AND status = 'published'",
+      "SELECT id, title FROM articles WHERE id = $1 AND status = 'published'",
       [id]
     );
     if (articleCheck.rows.length === 0) {
@@ -121,6 +122,15 @@ articleRouter.post('/:id/comments', authenticateUser, validateArticleIdParam, as
 
     const comment = insertRes.rows[0];
     comment.author_name = req.user.name;
+
+    await recordAuditLog(pool, {
+      userId: req.user.id,
+      action: 'CREATE',
+      entityType: 'article_comments',
+      entityId: comment.id,
+      details: `${req.user.email} (ID: ${req.user.id}) menambahkan komentar #${comment.id} di artikel "${articleCheck.rows[0].title}"`,
+      ipAddress: getClientIp(req)
+    });
 
     return res.status(201).json(comment);
   } catch (error) {
@@ -140,12 +150,19 @@ articleRouter.put('/comments/:commentId', authenticateUser, async (req, res) => 
   }
 
   try {
-    const checkRes = await pool.query('SELECT user_id FROM article_comments WHERE id = $1', [commentId]);
+    const checkRes = await pool.query(
+      `SELECT c.user_id, c.article_id, a.title AS article_title
+       FROM article_comments c
+       JOIN articles a ON c.article_id = a.id
+       WHERE c.id = $1`,
+      [commentId]
+    );
     if (checkRes.rows.length === 0) {
       return res.status(404).json({ detail: 'Komentar tidak ditemukan.' });
     }
 
-    if (checkRes.rows[0].user_id !== req.user.id && req.user.role !== 'admin') {
+    // Hanya pemilik komentar yang diizinkan mengubah komentarnya sendiri
+    if (checkRes.rows[0].user_id !== req.user.id) {
       return res.status(403).json({ detail: 'Anda tidak memiliki hak untuk mengubah komentar ini.' });
     }
 
@@ -156,6 +173,15 @@ articleRouter.put('/comments/:commentId', authenticateUser, async (req, res) => 
        RETURNING id, user_id, article_id, content, updated_at`,
       [content.trim(), commentId]
     );
+
+    await recordAuditLog(pool, {
+      userId: req.user.id,
+      action: 'UPDATE',
+      entityType: 'article_comments',
+      entityId: commentId,
+      details: `${req.user.email} (ID: ${req.user.id}) mengubah komentar #${commentId} di artikel "${checkRes.rows[0].article_title}"`,
+      ipAddress: getClientIp(req)
+    });
 
     return res.status(200).json(updateRes.rows[0]);
   } catch (error) {
@@ -170,16 +196,33 @@ articleRouter.delete('/comments/:commentId', authenticateUser, async (req, res) 
   }
 
   try {
-    const checkRes = await pool.query('SELECT user_id FROM article_comments WHERE id = $1', [commentId]);
+    const checkRes = await pool.query(
+      `SELECT c.user_id, c.article_id, a.title AS article_title
+       FROM article_comments c
+       JOIN articles a ON c.article_id = a.id
+       WHERE c.id = $1`,
+      [commentId]
+    );
     if (checkRes.rows.length === 0) {
       return res.status(404).json({ detail: 'Komentar tidak ditemukan.' });
     }
 
-    if (checkRes.rows[0].user_id !== req.user.id && req.user.role !== 'admin') {
+    // Hanya pemilik komentar yang diizinkan menghapus komentarnya sendiri (admin dilarang menghapus komentar user lain)
+    if (checkRes.rows[0].user_id !== req.user.id) {
       return res.status(403).json({ detail: 'Anda tidak memiliki hak untuk menghapus komentar ini.' });
     }
 
     await pool.query('DELETE FROM article_comments WHERE id = $1', [commentId]);
+
+    await recordAuditLog(pool, {
+      userId: req.user.id,
+      action: 'DELETE',
+      entityType: 'article_comments',
+      entityId: commentId,
+      details: `${req.user.email} (ID: ${req.user.id}) menghapus komentar #${commentId} di artikel "${checkRes.rows[0].article_title}"`,
+      ipAddress: getClientIp(req)
+    });
+
     return res.status(200).json({ message: 'Komentar berhasil dihapus.' });
   } catch (error) {
     return res.status(500).json({ detail: 'Gagal menghapus komentar.' });
