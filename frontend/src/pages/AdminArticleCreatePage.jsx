@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminLayout from '../components/AdminLayout';
+import api from '../api/axios';
 
 const CATEGORIES = [
   { label: 'Umum', value: 'umum' },
@@ -219,7 +220,25 @@ export default function AdminArticleCreatePage() {
 
     setIsSubmitting(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 400));
+      let finalImageUrl = imageUrlInput.trim();
+      if (coverTab === 'upload' && uploadedFile?.rawFile) {
+        finalImageUrl = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.onerror = () => resolve('');
+          reader.readAsDataURL(uploadedFile.rawFile);
+        });
+      }
+
+      const selectedCategory = CATEGORIES.find((c) => c.value === category)?.label || 'Umum';
+
+      await api.post('/api/admin/articles', {
+        title: title.trim(),
+        category: selectedCategory,
+        description: description.trim(),
+        status,
+        image_url: finalImageUrl || 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=800',
+      });
 
       navigate('/admin/articles', {
         replace: true,
@@ -230,10 +249,11 @@ export default function AdminArticleCreatePage() {
               : 'Artikel disimpan sebagai arsip',
         },
       });
-    } catch {
+    } catch (err) {
+      console.error('Gagal membuat artikel:', err);
       setErrors((prev) => ({
         ...prev,
-        submit: 'Gagal menyimpan artikel. Coba lagi.',
+        submit: err.response?.data?.detail || 'Gagal menyimpan artikel. Coba lagi.',
       }));
     } finally {
       setIsSubmitting(false);

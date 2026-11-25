@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import AdminLayout from '../components/AdminLayout';
+import api from '../api/axios';
 
 const MOCK_ADMIN_STATS = {
   total_students: 1248,
@@ -127,12 +128,13 @@ export default function AdminDashboardPage() {
       setIsLoading(true);
       setHasError(false);
       try {
-        await new Promise((resolve) => setTimeout(resolve, 250));
+        const response = await api.get('/api/admin/dashboard-stats');
         if (!isMounted) return;
-        setStats(MOCK_ADMIN_STATS);
-        setArticles(MOCK_RECENT_ARTICLES);
-        setLogs(MOCK_RECENT_LOGS);
-      } catch {
+        setStats(response.data.stats || MOCK_ADMIN_STATS);
+        setArticles(response.data.recent_articles || []);
+        setLogs(response.data.recent_logs || []);
+      } catch (err) {
+        console.error('Gagal memuat statistik dashboard:', err);
         if (isMounted) setHasError(true);
       } finally {
         if (isMounted) setIsLoading(false);
@@ -196,18 +198,20 @@ export default function AdminDashboardPage() {
 
     setIsDeleting(true);
     try {
+      await api.delete(`/api/admin/articles/${deleteTarget.id}`);
       setArticles((prev) => prev.filter((item) => item.id !== deleteTarget.id));
       setLogs((prev) => [
         {
           id: Date.now(),
           action: 'DELETE',
           details: `Menghapus artikel #${deleteTarget.id}`,
-          time: 'Baru saja',
+          time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
         },
         ...prev.slice(0, 4),
       ]);
       setDeleteTarget(null);
-    } catch {
+    } catch (err) {
+      console.error('Gagal menghapus artikel:', err);
       setDeleteTarget(null);
       setHasError(true);
     } finally {

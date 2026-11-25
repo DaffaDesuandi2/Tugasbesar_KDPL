@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import AdminLayout from '../components/AdminLayout';
+import api from '../api/axios';
 
 const ARTICLE_CATEGORIES = ['Semua', 'Akademik', 'Teknologi', 'Karier', 'Kampus', 'Umum'];
 
@@ -184,10 +185,13 @@ export default function AdminArticlesPage() {
       setIsLoading(true);
       setHasError(false);
       try {
-        await new Promise((resolve) => setTimeout(resolve, 250));
+        const response = await api.get('/api/admin/articles', {
+          params: { limit: 100 }
+        });
         if (!isMounted) return;
-        setArticles(INITIAL_ADMIN_ARTICLES);
-      } catch {
+        setArticles(response.data.articles || []);
+      } catch (err) {
+        console.error('Gagal mengambil daftar artikel:', err);
         if (isMounted) setHasError(true);
       } finally {
         if (isMounted) setIsLoading(false);
@@ -262,10 +266,12 @@ export default function AdminArticlesPage() {
 
     setIsDeleting(true);
     try {
+      await api.delete(`/api/admin/articles/${deleteTarget.id}`);
       setArticles((prev) => prev.filter((item) => item.id !== deleteTarget.id));
       setDeleteTarget(null);
       setToastMessage('Artikel dihapus');
-    } catch {
+    } catch (err) {
+      console.error('Gagal menghapus artikel:', err);
       setDeleteTarget(null);
       setHasError(true);
     } finally {
