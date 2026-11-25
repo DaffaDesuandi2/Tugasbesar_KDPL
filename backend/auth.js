@@ -216,6 +216,14 @@ authRouter.post('/login', loginLimiter, validateLoginInput, async (req, res) => 
     const userRes = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
 
     if (userRes.rows.length === 0) {
+      await recordAuditLog(pool, {
+        userId: null,
+        action: 'LOGIN_FAILED',
+        entityType: 'users',
+        entityId: null,
+        details: `Login gagal untuk email ${email}: akun tidak ditemukan.`,
+        ipAddress: getClientIp(req),
+      });
       return res.status(401).json({ detail: 'Email atau kata sandi tidak valid.' });
     }
 
@@ -239,6 +247,14 @@ authRouter.post('/login', loginLimiter, validateLoginInput, async (req, res) => 
     }
 
     if (!user.is_active) {
+      await recordAuditLog(pool, {
+        userId: user.id,
+        action: 'LOGIN_FAILED',
+        entityType: 'users',
+        entityId: user.id,
+        details: `Login gagal untuk akun ${email}: akun telah dinonaktifkan.`,
+        ipAddress: getClientIp(req),
+      });
       return res.status(403).json({ detail: 'Akun Anda telah dinonaktifkan.' });
     }
 
