@@ -7,10 +7,11 @@ const ACTION_OPTIONS = [
   'Semua',
   'LOGIN_SUCCESS',
   'LOGIN_FAILED',
+  'LOGOUT',
   'CREATE',
   'UPDATE',
   'DELETE',
-  'TOGGLE_USER',
+  'TOGGLE_USER_STATUS',
 ];
 
 const ENTITY_OPTIONS = ['Semua', 'users', 'articles', 'article_comments'];
@@ -18,102 +19,12 @@ const ENTITY_OPTIONS = ['Semua', 'users', 'articles', 'article_comments'];
 const ACTION_BADGE_STYLES = {
   LOGIN_SUCCESS: 'bg-[#DCFCE7] text-[#166534]',
   LOGIN_FAILED: 'bg-[#FEE2E2] text-[#B91C1C]',
+  LOGOUT: 'bg-[#F3F4F6] text-[#374151]',
   CREATE: 'bg-[#E0F2FE] text-[#0C4A6E]',
   UPDATE: 'bg-[#E0F2FE] text-[#0C4A6E]',
   DELETE: 'bg-[#FEE2E2] text-[#B91C1C]',
-  TOGGLE_USER: 'bg-[#FEF3C7] text-[#92400E]',
+  TOGGLE_USER_STATUS: 'bg-[#FEF3C7] text-[#92400E]',
 };
-
-const INITIAL_AUDIT_LOGS = [
-  {
-    id: 5402,
-    created_at_wib: '21 Nov 2026 10:42:15',
-    iso_date: '2026-11-21',
-    user_name: 'Super Admin PosTera',
-    action: 'TOGGLE_USER',
-    entity_type: 'users',
-    entity_label: 'users #3',
-    detail: 'Menonaktifkan akun fajarnur',
-    ip_address: '203.0.113.10',
-  },
-  {
-    id: 5401,
-    created_at_wib: '21 Nov 2026 10:31:02',
-    iso_date: '2026-11-21',
-    user_name: 'ragilbayu12',
-    action: 'LOGIN_SUCCESS',
-    entity_type: 'users',
-    entity_label: 'users #1',
-    detail: 'Login berhasil',
-    ip_address: '203.0.113.45',
-  },
-  {
-    id: 5400,
-    created_at_wib: '21 Nov 2026 10:28:47',
-    iso_date: '2026-11-21',
-    user_name: null,
-    action: 'LOGIN_FAILED',
-    entity_type: 'users',
-    entity_label: 'users',
-    detail: 'Kredensial tidak cocok',
-    ip_address: '198.51.100.23',
-  },
-  {
-    id: 5399,
-    created_at_wib: '21 Nov 2026 10:15:09',
-    iso_date: '2026-11-21',
-    user_name: 'Super Admin PosTera',
-    action: 'UPDATE',
-    entity_type: 'articles',
-    entity_label: 'articles #14',
-    detail: 'Mengubah artikel Jadwal UTS Semester Ganjil',
-    ip_address: '203.0.113.10',
-  },
-  {
-    id: 5398,
-    created_at_wib: '21 Nov 2026 09:50:21',
-    iso_date: '2026-11-21',
-    user_name: 'Super Admin PosTera',
-    action: 'DELETE',
-    entity_type: 'article_comments',
-    entity_label: 'article_comments #482',
-    detail: 'Menghapus komentar (moderasi)',
-    ip_address: '203.0.113.10',
-  },
-  {
-    id: 5397,
-    created_at_wib: '21 Nov 2026 09:20:11',
-    iso_date: '2026-11-21',
-    user_name: 'Super Admin PosTera',
-    action: 'CREATE',
-    entity_type: 'articles',
-    entity_label: 'articles #16',
-    detail: 'Menambah artikel Tips Lolos Seleksi Magang',
-    ip_address: '203.0.113.10',
-  },
-  {
-    id: 5396,
-    created_at_wib: '21 Nov 2026 09:02:54',
-    iso_date: '2026-11-21',
-    user_name: 'Super Admin PosTera',
-    action: 'DELETE',
-    entity_type: 'articles',
-    entity_label: 'articles #9',
-    detail: 'Menghapus artikel',
-    ip_address: '203.0.113.10',
-  },
-  {
-    id: 5395,
-    created_at_wib: '20 Nov 2026 18:14:30',
-    iso_date: '2026-11-20',
-    user_name: 'Super Admin PosTera',
-    action: 'TOGGLE_USER',
-    entity_type: 'users',
-    entity_label: 'users #103',
-    detail: 'Mengaktifkan akun sariintan',
-    ip_address: '203.0.113.10',
-  },
-];
 
 export default function AdminAuditLogsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -211,7 +122,7 @@ export default function AdminAuditLogsPage() {
         !keyword
           ? true
           : (item.user_name || '').toLowerCase().includes(keyword) ||
-          item.ip_address.toLowerCase().includes(keyword);
+          (item.ip_address || '').toLowerCase().includes(keyword);
 
       return matchAction && matchEntity && matchFrom && matchTo && matchSearch;
     });
@@ -443,8 +354,8 @@ export default function AdminAuditLogsPage() {
                     type="button"
                     onClick={() => setCurrentPage(page)}
                     className={`min-w-9 h-9 px-2 rounded-full text-sm font-semibold border transition-colors cursor-pointer ${safePage === page
-                        ? 'bg-[#0C4A6E] text-white border-[#0C4A6E]'
-                        : 'bg-white text-[#1F2937] border-gray-300 hover:bg-gray-50'
+                      ? 'bg-[#0C4A6E] text-white border-[#0C4A6E]'
+                      : 'bg-white text-[#1F2937] border-gray-300 hover:bg-gray-50'
                       }`}
                   >
                     {page}
