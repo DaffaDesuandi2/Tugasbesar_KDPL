@@ -1,7 +1,9 @@
 # 📰 PosTera
-### Portal Artikel Kampus Berbasis Web
+### Portal Artikel Kampus Berbasis Web Aman (Microsoft SDL)
 
-**PosTera** merupakan aplikasi portal artikel kampus berbasis web yang dikembangkan dengan memperhatikan aspek keamanan perangkat lunak menggunakan kerangka kerja **Microsoft Security Development Lifecycle (SDL)**.
+**PosTera** adalah aplikasi portal artikel kampus berbasis web yang dikembangkan menggunakan kerangka kerja **Microsoft Security Development Lifecycle (SDL)** dengan pemisahan hak akses **Admin** dan **Mahasiswa (User Biasa)**.
+
+---
 
 ## 📌 Informasi Proyek
 
@@ -9,12 +11,11 @@
 |---|---|
 | Nama Aplikasi | PosTera |
 | Tema | Portal Artikel Kampus |
-| Judul Proyek | Pengembangan Sistem Informasi Portal Artikel "PosTera" Berbasis Web Aman Menggunakan Kerangka Kerja Microsoft SDL |
-| Platform | Web |
+| Judul Proyek | Pengembangan Aplikasi Portal Artikel "PosTera" Berbasis Web Aman Menggunakan Kerangka Kerja Microsoft SDL |
+| Platform | Web (React SPA + Express.js API + PostgreSQL) |
 | Metodologi Keamanan | Microsoft Security Development Lifecycle (SDL) |
-| Status | Dalam Pengembangan |
 
-## 📖 Deskripsi Proyek
+---
 
 PosTera adalah aplikasi portal artikel kampus sederhana yang dirancang sebagai media publikasi dan penyebaran informasi di lingkungan kampus.
 
@@ -56,17 +57,20 @@ Pengembangan PosTera menerapkan prinsip keamanan perangkat lunak berdasarkan Mic
 
 ## 🔐 Keamanan Sistem
 
-PosTera dirancang dengan mempertimbangkan beberapa aspek keamanan berikut:
+## 🔐 Kontrol Keamanan Microsoft SDL
 
-| Aspek Keamanan | Rencana Implementasi |
-|---|---|
-| Authentication | Login dan pengelolaan sesi pengguna |
-| Authorization | Pembatasan akses berdasarkan role Admin dan Mahasiswa |
-| Access Control | Pengguna hanya dapat mengubah atau menghapus komentar miliknya |
-| Input Validation | Validasi masukan untuk mengurangi risiko input berbahaya |
-| Password Security | Penyimpanan kata sandi menggunakan hashing yang aman |
-| Account Management | Penonaktifan akun pengguna oleh Admin |
-| Security Testing | Pengujian terhadap potensi kerentanan aplikasi |
+| ID SR | Aspek Keamanan | Implementasi |
+|---|---|---|
+| `SR-AUTH-01` | Password Storage | Hashing kata sandi menggunakan `bcryptjs` (cost 12) |
+| `SR-AUTH-02/03` | Authentication | Validasi kompleksitas password, pesan gagal login generik, rate limit 5x/menit (`HTTP 429`) |
+| `SR-SESS-01` | Session Management | Regenerasi session ID saat login, invalidasi sesi di server saat logout |
+| `SR-AUTHZ-01/02` | Authorization & IDOR | Middleware `requireAdmin` (*deny by default*) dan pemeriksaan kepemilikan komentar di server |
+| `SR-INP-01` | Input Validation | Validasi server-side (judul artikel `3–150` karakter, ID integer positif -> `HTTP 422`) |
+| `SR-INP-02` | Anti-SQL Injection | Seluruh kueri database menggunakan parameterized query (`$1..$n` via `pg`) |
+| `SR-INP-03` | Anti-XSS | Auto-escaping React JSX untuk komentar & rendering aman Markdown |
+| `SR-INP-04` | Proteksi CSRF | Middleware `verifyCsrfToken` pada seluruh metode mutasi (`POST`, `PUT`, `PATCH`, `DELETE`) |
+| `SR-CONF-01` | Secrets Management | Konfigurasi sensitif di `.env` dan dikecualikan lewat `.gitignore` |
+| `SR-LOG-01` | Audit Logging | Pencatatan transaksi aksi `CREATE`, `UPDATE`, `DELETE` artikel dan `TOGGLE_USER_STATUS` ke tabel `audit_logs` |
 
 ## 🛡️ Penerapan Microsoft SDL
 
@@ -82,42 +86,87 @@ Pengembangan aplikasi mengacu pada tahapan Microsoft Security Development Lifecy
 
 ## 🛠️ Teknologi yang Digunakan
 
-*Disesuaikan dengan teknologi yang dipilih oleh kelompok.*
-
 | Komponen | Teknologi |
 |---|---|
-| Frontend | React |
-| Backend | Node.js |
-| Database | PostgreSQL |
-| Version Control | Git & GitHub |
-| Security Framework | Microsoft SDL |
+| Frontend | React 19, Vite, Tailwind CSS, Axios |
+| Backend | Node.js, Express.js |
+| Database | PostgreSQL (`pg`) |
+| Security & Testing | `bcryptjs`, `express-rate-limit`, `cookie-parser`, `node:test`, ESLint |
+
+---
+
+## 📂 Struktur Direktori Repositori
+
+```text
+Tugasbesar_KDPL/
+├── backend/                     # Express.js API, middleware keamanan, migrasi, seeder, & tests
+│   ├── controllers/             # Business logic (articleController.js)
+│   ├── middleware/              # authorization.js, csrf.js, validation.js
+│   ├── utils/                   # Helper audit log (auditLog.js)
+│   ├── tests/                   # Automated unit & security integration tests
+│   ├── adminRoutes.js           # Rute terproteksi Admin (/api/admin/*)
+│   ├── articleRoutes.js         # Rute artikel publik & CRUD Admin (/articles, /api/articles)
+│   ├── auth.js                  # Autentikasi, OTP, & manajemen sesi
+│   ├── database.js              # Koneksi PostgreSQL & skema tabel
+│   ├── migrate.js               # Skrip migrasi database
+│   ├── seed.js                  # Skrip seeder akun Admin
+│   └── server.js                # Entry point server Express
+├── frontend/                    # Aplikasi React SPA (halaman publik & panel Admin)
+│   └── src/                     # Komponen, halaman, context, dan konfigurasi Axios CSRF
+├── docs/
+│   ├── progress/                # Ringkasan progres mingguan & kontribusi anggota
+│   ├── security/                # Security Requirements (SR) & Unsafe Function Analysis
+│   ├── design/                  # Arsitektur, Trust Boundary, Attack Surface, & ERD
+│   ├── testing/                 # Daftar Test Case keamanan (test-cases.md)
+│   └── evidence/                # Bukti implementasi, SAST, dan hasil pengujian
+├── .gitignore
+└── README.md
+```
+
+---
+
+## 🚀 Status Pengembangan
+
+### 1. Backend (`backend/`)
+```bash
+cd backend
+npm install
+# Siapkan file .env (DATABASE_URL, PORT, EMAIL_USER, EMAIL_PASS)
+npm run migrate
+npm run seed
+npm run dev
+```
+
+Menjalankan pengujian:
+```bash
+cd backend
+npm run test:articles:unit   # Unit & mock-DB security test (TC-06 s.d. TC-10)
+npm run test:authorization   # Unit test middleware RBAC
+npm test                     # Seluruh suite test (memerlukan PostgreSQL aktif)
+```
+
+### 2. Frontend (`frontend/`)
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Build produksi & lint:
+```bash
+cd frontend
+npm run lint
+npm run build
+```
+
+---
 
 ## 👥 Anggota Kelompok
 
 | No. | Nama Anggota | NIM | Peran |
 |---|---|---|---|
-| 1 | Muhammad Daffansyah Desuandi | 123140127 | [Peran] |
-| 2 | Ragil Bayu Saputra | 123140128 | [Frontend Developer] |
+| 1 | Muhammad Daffansyah Desuandi | 123140127 | Security Lead |
+| 2 | Ragil Bayu Saputra | 123140128 | Frontend Developer |
 | 3 | Arsa Salsabila | 123140108 | QA / Security Tester |
-| 4 | Grace Exauditha Nababan | 123140115 | [Peran] |
-| 5 | [Andre Prasetya Daely] | 123140131 | [Backend Developer] |
-
-## 📂 Struktur Proyek
-
-Struktur direktori akan disesuaikan dengan teknologi dan arsitektur aplikasi yang digunakan selama pengembangan.
-
-## 🚀 Status Pengembangan
-
-Proyek PosTera saat ini berada pada tahap perencanaan dan pengembangan awal. Fitur serta mekanisme keamanan akan dikembangkan dan diuji secara bertahap sesuai kebutuhan proyek.
-
-## 📚 Referensi
-
-- [Microsoft Security Development Lifecycle](https://www.microsoft.com/en-us/securityengineering/sdl)
-- [OWASP Top 10](https://owasp.org/www-project-top-ten/)
-- [OWASP Web Security Testing Guide](https://owasp.org/www-project-web-security-testing-guide/)
-
----
-
-**PosTera — Portal Artikel Kampus**
-
-*Dikembangkan sebagai proyek penerapan keamanan perangkat lunak berbasis Microsoft SDL.*
+| 4 | Grace Exauditha Nababan | 123140115 | Integration & DevOps |
+| 5 | Andre Prasetya Daely | 123140131 | Lead Developer (Backend) |

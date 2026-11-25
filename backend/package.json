@@ -12,7 +12,9 @@
     "test": "node --test --test-concurrency=1 tests/*.test.js",
     "test:auth": "node --test tests/auth.test.js",
     "test:admin": "node --test tests/admin.test.js",
-    "test:authorization": "node --test tests/authorization.test.js"
+    "test:authorization": "node --test tests/authorization.test.js",
+    "test:articles": "node --test tests/articles.test.js",
+    "test:articles:unit": "node --test tests/articles.unit.test.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

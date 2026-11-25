@@ -307,11 +307,10 @@ export default function AdminArticlesPage() {
           <button
             type="button"
             onClick={() => handleStatusChange('all')}
-            className={`px-4 py-1.75 rounded-full text-sm font-semibold border transition-colors cursor-pointer ${
-              statusFilter === 'all'
+            className={`px-4 py-1.75 rounded-full text-sm font-semibold border transition-colors cursor-pointer ${statusFilter === 'all'
                 ? 'bg-[#0369A1] text-white border-[#0369A1]'
                 : 'bg-white text-[#1F2937] border-[#D1D5DB] hover:bg-gray-50'
-            }`}
+              }`}
           >
             Semua ({counts.all})
           </button>
@@ -319,11 +318,10 @@ export default function AdminArticlesPage() {
           <button
             type="button"
             onClick={() => handleStatusChange('published')}
-            className={`px-4 py-1.75 rounded-full text-sm font-semibold border transition-colors cursor-pointer ${
-              statusFilter === 'published'
+            className={`px-4 py-1.75 rounded-full text-sm font-semibold border transition-colors cursor-pointer ${statusFilter === 'published'
                 ? 'bg-[#0369A1] text-white border-[#0369A1]'
                 : 'bg-white text-[#1F2937] border-[#D1D5DB] hover:bg-gray-50'
-            }`}
+              }`}
           >
             Terbit ({counts.published})
           </button>
@@ -331,11 +329,10 @@ export default function AdminArticlesPage() {
           <button
             type="button"
             onClick={() => handleStatusChange('archived')}
-            className={`px-4 py-1.75 rounded-full text-sm font-semibold border transition-colors cursor-pointer ${
-              statusFilter === 'archived'
+            className={`px-4 py-1.75 rounded-full text-sm font-semibold border transition-colors cursor-pointer ${statusFilter === 'archived'
                 ? 'bg-[#0369A1] text-white border-[#0369A1]'
                 : 'bg-white text-[#1F2937] border-[#D1D5DB] hover:bg-gray-50'
-            }`}
+              }`}
           >
             Arsip ({counts.archived})
           </button>
@@ -443,11 +440,10 @@ export default function AdminArticlesPage() {
 
                         <td className="px-3 py-2.5 align-middle whitespace-nowrap">
                           <span
-                            className={`inline-block uppercase text-xs font-bold px-3 py-1.25 rounded-full ${
-                              isPublished
+                            className={`inline-block uppercase text-xs font-bold px-3 py-1.25 rounded-full ${isPublished
                                 ? 'bg-[#DCFCE7] text-[#166534]'
                                 : 'bg-[#E5E7EB] text-[#374151]'
-                            }`}
+                              }`}
                           >
                             {isPublished ? 'TERBIT' : 'ARSIP'}
                           </span>
@@ -509,11 +505,10 @@ export default function AdminArticlesPage() {
                     key={page}
                     type="button"
                     onClick={() => setCurrentPage(page)}
-                    className={`min-w-9 h-9 px-2 rounded-full text-sm font-semibold border transition-colors cursor-pointer ${
-                      safePage === page
+                    className={`min-w-9 h-9 px-2 rounded-full text-sm font-semibold border transition-colors cursor-pointer ${safePage === page
                         ? 'bg-[#0C4A6E] text-white border-[#0C4A6E]'
                         : 'bg-white text-[#1F2937] border-gray-300 hover:bg-gray-50'
-                    }`}
+                      }`}
                   >
                     {page}
                   </button>

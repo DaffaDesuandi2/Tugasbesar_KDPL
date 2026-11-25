@@ -1,12 +1,111 @@
 import { Router } from 'express';
 import { authenticateUser } from './auth.js';
 import { requireAdmin } from './middleware/authorization.js';
+import {
+  parsePositiveIntId,
+  validateArticleIdParam,
+  validateCreateArticleInput,
+  validatePatchArticleInput
+} from './middleware/validation.js';
+import {
+  createArticle,
+  deleteArticle,
+  getAdminArticleById,
+  listAdminArticles,
+  updateArticle
+} from './controllers/articleController.js';
 import { pool } from './database.js';
+import { getClientIp, recordAuditLog } from './utils/auditLog.js';
 
 export const adminRouter = Router();
 
-// Seluruh route di adminRouter diproteksi (Deny by default); jangan letakkan route publik di sini.
 adminRouter.use(authenticateUser, requireAdmin);
+
+/**
+ * Manajemen Artikel Admin (menampilkan seluruh status termasuk archived)
+ */
+adminRouter.get('/articles', listAdminArticles);
+adminRouter.get('/articles/:id', validateArticleIdParam, getAdminArticleById);
+adminRouter.post('/articles', validateCreateArticleInput, createArticle);
+adminRouter.put('/articles/:id', validateArticleIdParam, validateCreateArticleInput, updateArticle);
+adminRouter.patch('/articles/:id', validateArticleIdParam, validatePatchArticleInput, updateArticle);
+adminRouter.delete('/articles/:id', validateArticleIdParam, deleteArticle);
+
+/**
+ * GET /api/admin/audit-logs
+ * Membaca log aktivitas sistem secara read-only untuk halaman Audit Log Admin (SR-LOG-01).
+ */
+adminRouter.get('/audit-logs', async (req, res) => {
+  const { action, entity_type, from, to, search, page = 1, limit = 50 } = req.query || {};
+  const parsedPage = Math.max(1, Number.parseInt(page, 10) || 1);
+  const parsedLimit = Math.min(100, Math.max(1, Number.parseInt(limit, 10) || 50));
+  const offset = (parsedPage - 1) * parsedLimit;
+
+  const conditions = [];
+  const params = [];
+
+  if (action && action !== 'Semua') {
+    params.push(String(action).trim());
+    conditions.push(`al.action = $${params.length}`);
+  }
+
+  if (entity_type && entity_type !== 'Semua') {
+    params.push(String(entity_type).trim());
+    conditions.push(`al.entity_type = $${params.length}`);
+  }
+
+  if (from && /^\d{4}-\d{2}-\d{2}$/.test(String(from))) {
+    params.push(String(from));
+    conditions.push(`(al.created_at AT TIME ZONE 'Asia/Jakarta')::date >= $${params.length}::date`);
+  }
+
+  if (to && /^\d{4}-\d{2}-\d{2}$/.test(String(to))) {
+    params.push(String(to));
+    conditions.push(`(al.created_at AT TIME ZONE 'Asia/Jakarta')::date <= $${params.length}::date`);
+  }
+
+  if (search && typeof search === 'string' && search.trim()) {
+    params.push(`%${search.trim().slice(0, 100).toLowerCase()}%`);
+    conditions.push(
+      `(LOWER(COALESCE(u.name, '')) LIKE $${params.length} OR LOWER(COALESCE(al.ip_address, '')) LIKE $${params.length} OR LOWER(COALESCE(al.details, '')) LIKE $${params.length})`
+    );
+  }
+
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  try {
+    const countRes = await pool.query(
+      `SELECT COUNT(*)
+       FROM audit_logs al
+       LEFT JOIN users u ON al.user_id = u.id
+       ${whereClause}`,
+      params
+    );
+    const total = Number.parseInt(countRes.rows[0].count, 10);
+
+    const listParams = [...params, parsedLimit, offset];
+    const logsRes = await pool.query(
+      `SELECT al.id, al.user_id, u.name AS user_name, al.action, al.entity_type, al.entity_id,
+              al.details, al.ip_address, al.created_at
+       FROM audit_logs al
+       LEFT JOIN users u ON al.user_id = u.id
+       ${whereClause}
+       ORDER BY al.created_at DESC, al.id DESC
+       LIMIT $${listParams.length - 1} OFFSET $${listParams.length}`,
+      listParams
+    );
+
+    return res.status(200).json({
+      logs: logsRes.rows,
+      total,
+      page: parsedPage,
+      totalPages: Math.max(1, Math.ceil(total / parsedLimit))
+    });
+  } catch (error) {
+    console.error('Gagal mengambil audit logs:', error);
+    return res.status(500).json({ detail: 'Gagal memuat catatan audit log.' });
+  }
+});
 
 /**
  * GET /api/admin/users
@@ -52,8 +151,8 @@ adminRouter.patch('/users/:id/status', async (req, res) => {
   const { id } = req.params;
   const { is_active } = req.body;
   // 1. Validasi format ID: harus berupa angka integer positif
-  const targetUserId = parseInt(id, 10);
-  if (isNaN(targetUserId) || targetUserId <= 0) {
+  const targetUserId = parsePositiveIntId(id);
+  if (!targetUserId) {
     return res.status(422).json({
       detail: 'Validasi gagal: Parameter ID pengguna harus berupa integer positif.'
     });
@@ -91,21 +190,17 @@ adminRouter.patch('/users/:id/status', async (req, res) => {
       [is_active, targetUserId]
     );
     const updatedUser = updateRes.rows[0];
-    // 6. Catat perubahan ke tabel audit_logs (SR-AUD-01)
+    // 6. Catat perubahan ke tabel audit_logs (SR-AUD-01 / SR-LOG-01)
     const logDetails = `Admin ${req.user.email} (ID: ${req.user.id}) mengubah status akun ${targetUser.email} (ID: ${targetUser.id}) dari ${targetUser.is_active} menjadi ${is_active}`;
 
-    await pool.query(
-      `INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details, ip_address, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
-      [
-        req.user.id,
-        'TOGGLE_USER_STATUS',
-        'users',
-        targetUserId,
-        logDetails,
-        req.ip || req.connection.remoteAddress || '127.0.0.1'
-      ]
-    );
+    await recordAuditLog(pool, {
+      userId: req.user.id,
+      action: 'TOGGLE_USER_STATUS',
+      entityType: 'users',
+      entityId: targetUserId,
+      details: logDetails,
+      ipAddress: getClientIp(req)
+    });
     return res.status(200).json({
       message: `Status akun pengguna berhasil diperbarui menjadi ${is_active ? 'Aktif' : 'Nonaktif'}.`,
       user: updatedUser
