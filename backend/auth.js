@@ -13,6 +13,7 @@ import {
 import { validateRegisterInput, validateLoginInput } from './middleware/validation.js';
 import { csrfTokenHandler } from './middleware/csrf.js';
 import { sendOtpEmail } from './mailer.js';
+import { recordAuditLog, getClientIp } from './utils/auditLog.js';
 
 export const authRouter = Router();
 
@@ -226,6 +227,14 @@ authRouter.post('/login', loginLimiter, validateLoginInput, async (req, res) => 
         'UPDATE users SET failed_login_attempts = failed_login_attempts + 1 WHERE id = $1',
         [user.id]
       );
+      await recordAuditLog(pool, {
+        userId: user.id,
+        action: 'LOGIN_FAILED',
+        entityType: 'users',
+        entityId: user.id,
+        details: `Login gagal untuk akun ${email}: kata sandi tidak valid.`,
+        ipAddress: getClientIp(req),
+      });
       return res.status(401).json({ detail: 'Email atau kata sandi tidak valid.' });
     }
 
@@ -253,6 +262,15 @@ authRouter.post('/login', loginLimiter, validateLoginInput, async (req, res) => 
 
     res.cookie(SESSION_COOKIE_NAME, newSessionId, getSessionCookieOptions());
 
+    await recordAuditLog(pool, {
+      userId: user.id,
+      action: 'LOGIN_SUCCESS',
+      entityType: 'users',
+      entityId: user.id,
+      details: `Login berhasil untuk akun ${user.email} (role: ${user.role}).`,
+      ipAddress: getClientIp(req),
+    });
+
     return res.status(200).json({
       message: 'Login berhasil.',
       user: {
@@ -275,6 +293,15 @@ authRouter.post('/logout', authenticateUser, async (req, res) => {
     if (req.sessionId) {
       await pool.query('DELETE FROM sessions WHERE session_id = $1', [req.sessionId]);
     }
+
+    await recordAuditLog(pool, {
+      userId: req.user.id,
+      action: 'LOGOUT',
+      entityType: 'users',
+      entityId: req.user.id,
+      details: `Logout oleh akun ${req.user.email} (role: ${req.user.role}).`,
+      ipAddress: getClientIp(req),
+    });
 
     res.clearCookie(SESSION_COOKIE_NAME, {
       httpOnly: true,
