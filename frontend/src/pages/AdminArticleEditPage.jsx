@@ -293,11 +293,11 @@ export default function AdminArticleEditPage() {
 
   const isDirty = Boolean(
     initialData &&
-      (title !== initialData.title ||
-        category !== initialData.category ||
-        status !== initialData.status ||
-        description !== initialData.description ||
-        currentImageKey !== initialData.imageKey)
+    (title !== initialData.title ||
+      category !== initialData.category ||
+      status !== initialData.status ||
+      description !== initialData.description ||
+      currentImageKey !== initialData.imageKey)
   );
 
   useEffect(() => {
@@ -540,11 +540,10 @@ export default function AdminArticleEditPage() {
                         if (errors.title) setErrors((prev) => ({ ...prev, title: '' }));
                       }}
                       placeholder="Judul artikel..."
-                      className={`w-full min-h-11 px-3 bg-white border rounded-md text-[15px] text-[#1F2937] placeholder:text-[#4B5563] outline-none transition ${
-                        errors.title
+                      className={`w-full min-h-11 px-3 bg-white border rounded-md text-[15px] text-[#1F2937] placeholder:text-[#4B5563] outline-none transition ${errors.title
                           ? 'border-[#B91C1C]'
                           : `border-[#9CA3AF] ${inputFocusClass}`
-                      }`}
+                        }`}
                     />
                     {errors.title ? (
                       <p className="text-[13px] text-[#B91C1C] mt-1">{errors.title}</p>
@@ -591,11 +590,10 @@ export default function AdminArticleEditPage() {
                             setCoverTab('upload');
                             setErrors((prev) => ({ ...prev, image: '' }));
                           }}
-                          className={`px-3.5 py-1.5 rounded-md text-[13px] font-semibold transition-colors cursor-pointer ${
-                            coverTab === 'upload'
+                          className={`px-3.5 py-1.5 rounded-md text-[13px] font-semibold transition-colors cursor-pointer ${coverTab === 'upload'
                               ? 'bg-[#E0F2FE] text-[#0C4A6E]'
                               : 'bg-transparent text-[#4B5563] hover:bg-gray-100'
-                          }`}
+                            }`}
                         >
                           Unggah File
                         </button>
@@ -605,11 +603,10 @@ export default function AdminArticleEditPage() {
                             setCoverTab('url');
                             setErrors((prev) => ({ ...prev, image: '' }));
                           }}
-                          className={`px-3.5 py-1.5 rounded-md text-[13px] font-semibold transition-colors cursor-pointer ${
-                            coverTab === 'url'
+                          className={`px-3.5 py-1.5 rounded-md text-[13px] font-semibold transition-colors cursor-pointer ${coverTab === 'url'
                               ? 'bg-[#E0F2FE] text-[#0C4A6E]'
                               : 'bg-transparent text-[#4B5563] hover:bg-gray-100'
-                          }`}
+                            }`}
                         >
                           Tautan URL
                         </button>
@@ -713,13 +710,12 @@ export default function AdminArticleEditPage() {
                               setIsDragging(false);
                               handleProcessFile(e.dataTransfer.files?.[0]);
                             }}
-                            className={`h-37.5 rounded-[10px] px-4 flex flex-col items-center justify-center gap-2 text-center cursor-pointer transition-colors ${
-                              isDragging
+                            className={`h-37.5 rounded-[10px] px-4 flex flex-col items-center justify-center gap-2 text-center cursor-pointer transition-colors ${isDragging
                                 ? 'border-2 border-solid border-[#0369A1] bg-[#E0F2FE]'
                                 : errors.image
-                                ? 'border-2 border-dashed border-[#B91C1C] bg-[#F9FAFB]'
-                                : 'border-2 border-dashed border-[#9CA3AF] bg-[#F9FAFB] hover:border-[#0369A1]'
-                            }`}
+                                  ? 'border-2 border-dashed border-[#B91C1C] bg-[#F9FAFB]'
+                                  : 'border-2 border-dashed border-[#9CA3AF] bg-[#F9FAFB] hover:border-[#0369A1]'
+                              }`}
                           >
                             <svg
                               xmlns="http://www.w3.org/2000/svg"
@@ -769,11 +765,10 @@ export default function AdminArticleEditPage() {
                             if (errors.image) setErrors((prev) => ({ ...prev, image: '' }));
                           }}
                           placeholder="https://..."
-                          className={`w-full min-h-11 px-3 bg-white border rounded-md text-[15px] text-[#1F2937] placeholder:text-[#4B5563] outline-none transition ${
-                            errors.image
+                          className={`w-full min-h-11 px-3 bg-white border rounded-md text-[15px] text-[#1F2937] placeholder:text-[#4B5563] outline-none transition ${errors.image
                               ? 'border-[#B91C1C]'
                               : `border-[#9CA3AF] ${inputFocusClass}`
-                          }`}
+                            }`}
                         />
                         {errors.image ? (
                           <p className="text-[13px] text-[#B91C1C] mt-1">{errors.image}</p>
@@ -804,18 +799,16 @@ export default function AdminArticleEditPage() {
                       <button
                         type="button"
                         onClick={() => setStatus('published')}
-                        className={`flex-1 text-left rounded-lg flex items-start gap-3 transition-colors cursor-pointer ${
-                          status === 'published'
+                        className={`flex-1 text-left rounded-lg flex items-start gap-3 transition-colors cursor-pointer ${status === 'published'
                             ? 'border-2 border-[#0369A1] bg-[#E0F2FE] p-3.5'
                             : 'border border-[#9CA3AF] bg-white p-3.75 hover:bg-gray-50'
-                        }`}
+                          }`}
                       >
                         <span
-                          className={`w-4.5 h-4.5 rounded-full border-2 bg-white flex items-center justify-center shrink-0 mt-0.5 ${
-                            status === 'published'
+                          className={`w-4.5 h-4.5 rounded-full border-2 bg-white flex items-center justify-center shrink-0 mt-0.5 ${status === 'published'
                               ? 'border-[#0369A1]'
                               : 'border-[#9CA3AF]'
-                          }`}
+                            }`}
                         >
                           {status === 'published' && (
                             <span className="w-2 h-2 rounded-full bg-[#0369A1]" />
@@ -834,18 +827,16 @@ export default function AdminArticleEditPage() {
                       <button
                         type="button"
                         onClick={() => setStatus('archived')}
-                        className={`flex-1 text-left rounded-lg flex items-start gap-3 transition-colors cursor-pointer ${
-                          status === 'archived'
+                        className={`flex-1 text-left rounded-lg flex items-start gap-3 transition-colors cursor-pointer ${status === 'archived'
                             ? 'border-2 border-[#0369A1] bg-[#E0F2FE] p-3.5'
                             : 'border border-[#9CA3AF] bg-white p-3.75 hover:bg-gray-50'
-                        }`}
+                          }`}
                       >
                         <span
-                          className={`w-4.5 h-4.5 rounded-full border-2 bg-white flex items-center justify-center shrink-0 mt-0.5 ${
-                            status === 'archived'
+                          className={`w-4.5 h-4.5 rounded-full border-2 bg-white flex items-center justify-center shrink-0 mt-0.5 ${status === 'archived'
                               ? 'border-[#0369A1]'
                               : 'border-[#9CA3AF]'
-                          }`}
+                            }`}
                         >
                           {status === 'archived' && (
                             <span className="w-2 h-2 rounded-full bg-[#0369A1]" />
@@ -875,22 +866,20 @@ export default function AdminArticleEditPage() {
                         <button
                           type="button"
                           onClick={() => setEditorTab('write')}
-                          className={`px-3.5 py-1.5 rounded-md text-[13px] font-semibold transition-colors cursor-pointer ${
-                            editorTab === 'write'
+                          className={`px-3.5 py-1.5 rounded-md text-[13px] font-semibold transition-colors cursor-pointer ${editorTab === 'write'
                               ? 'bg-[#E0F2FE] text-[#0C4A6E]'
                               : 'bg-transparent text-[#4B5563] hover:bg-gray-100'
-                          }`}
+                            }`}
                         >
                           Tulis
                         </button>
                         <button
                           type="button"
                           onClick={() => setEditorTab('preview')}
-                          className={`px-3.5 py-1.5 rounded-md text-[13px] font-semibold transition-colors cursor-pointer ${
-                            editorTab === 'preview'
+                          className={`px-3.5 py-1.5 rounded-md text-[13px] font-semibold transition-colors cursor-pointer ${editorTab === 'preview'
                               ? 'bg-[#E0F2FE] text-[#0C4A6E]'
                               : 'bg-transparent text-[#4B5563] hover:bg-gray-100'
-                          }`}
+                            }`}
                         >
                           Pratinjau
                         </button>
@@ -908,11 +897,10 @@ export default function AdminArticleEditPage() {
                           }
                         }}
                         placeholder="Tulis isi artikel dengan Markdown..."
-                        className={`w-full min-h-42.5 p-3 bg-white border rounded-md text-[15px] leading-[1.7] text-[#1F2937] placeholder:text-[#4B5563] outline-none resize-y transition ${
-                          errors.description
+                        className={`w-full min-h-42.5 p-3 bg-white border rounded-md text-[15px] leading-[1.7] text-[#1F2937] placeholder:text-[#4B5563] outline-none resize-y transition ${errors.description
                             ? 'border-[#B91C1C]'
                             : `border-[#9CA3AF] ${inputFocusClass}`
-                        }`}
+                          }`}
                       />
                     ) : (
                       <div className="w-full min-h-42.5 p-3 bg-[#F9FAFB] border border-[#9CA3AF] rounded-md">

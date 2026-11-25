@@ -1,0 +1,21 @@
+# Environment & Secrets (SR-CONF-01)
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+venv/
+
+# Build & Logs
+dist/
+dist-ssr/
+*.log
+*.local
+.vite/
+
+# OS & Editor
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json

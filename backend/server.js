@@ -19,13 +19,14 @@ app.use(cors({
   credentials: true
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: '4mb' }));
 app.use(cookieParser());
 app.use(verifyCsrfToken);
 
 app.use('/api/auth', authRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/articles', articleRouter);
+app.use('/articles', articleRouter);
 
 app.get('/', (req, res) => {
   res.json({

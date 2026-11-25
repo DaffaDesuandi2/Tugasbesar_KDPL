@@ -207,7 +207,7 @@ export default function AdminAuditLogsPage() {
         !keyword
           ? true
           : (item.user_name || '').toLowerCase().includes(keyword) ||
-            item.ip_address.toLowerCase().includes(keyword);
+          item.ip_address.toLowerCase().includes(keyword);
 
       return matchAction && matchEntity && matchFrom && matchTo && matchSearch;
     });
@@ -438,11 +438,10 @@ export default function AdminAuditLogsPage() {
                     key={page}
                     type="button"
                     onClick={() => setCurrentPage(page)}
-                    className={`min-w-9 h-9 px-2 rounded-full text-sm font-semibold border transition-colors cursor-pointer ${
-                      safePage === page
+                    className={`min-w-9 h-9 px-2 rounded-full text-sm font-semibold border transition-colors cursor-pointer ${safePage === page
                         ? 'bg-[#0C4A6E] text-white border-[#0C4A6E]'
                         : 'bg-white text-[#1F2937] border-gray-300 hover:bg-gray-50'
-                    }`}
+                      }`}
                   >
                     {page}
                   </button>

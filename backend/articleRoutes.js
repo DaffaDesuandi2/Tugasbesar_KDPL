@@ -1,61 +1,25 @@
 import { Router } from 'express';
 import { pool } from './database.js';
 import { authenticateUser } from './auth.js';
+import { requireAdmin } from './middleware/authorization.js';
+import {
+  parsePositiveIntId,
+  validateArticleIdParam,
+  validateCreateArticleInput,
+  validatePatchArticleInput
+} from './middleware/validation.js';
+import {
+  createArticle,
+  deleteArticle,
+  getPublicArticleById,
+  listPublicArticles,
+  updateArticle
+} from './controllers/articleController.js';
 
 export const articleRouter = Router();
 
-articleRouter.get('/', async (req, res) => {
-  const { category, search, page = 1, limit = 9 } = req.query;
-  const offset = (Math.max(1, parseInt(page, 10)) - 1) * parseInt(limit, 10);
-
-  const conditions = ["a.status = 'published'"];
-  const params = [];
-
-  if (category && category !== 'semua') {
-    params.push(category);
-    conditions.push(`a.category = $${params.length}`);
-  }
-
-  if (search && search.trim()) {
-    params.push(`%${search.trim().toLowerCase()}%`);
-    conditions.push(`(LOWER(a.title) LIKE $${params.length} OR LOWER(a.description) LIKE $${params.length})`);
-  }
-
-  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-
-  try {
-    const countQuery = `SELECT COUNT(*) FROM articles a ${whereClause}`;
-    const totalRes = await pool.query(countQuery, params);
-    const total = parseInt(totalRes.rows[0].count, 10);
-
-    params.push(parseInt(limit, 10));
-    params.push(offset);
-
-    const listQuery = `
-      SELECT a.id, a.user_id, a.title, a.description, a.image_url, a.category, a.status, a.created_at,
-             u.name AS author_name,
-             COUNT(ac.id)::int AS comments_count
-      FROM articles a
-      JOIN users u ON a.user_id = u.id
-      LEFT JOIN article_comments ac ON a.id = ac.article_id
-      ${whereClause}
-      GROUP BY a.id, u.name
-      ORDER BY a.created_at DESC
-      LIMIT $${params.length - 1} OFFSET $${params.length}
-    `;
-
-    const result = await pool.query(listQuery, params);
-
-    return res.status(200).json({
-      articles: result.rows,
-      total,
-      page: parseInt(page, 10),
-      totalPages: Math.ceil(total / parseInt(limit, 10))
-    });
-  } catch (error) {
-    return res.status(500).json({ detail: 'Gagal memuat daftar artikel.' });
-  }
-});
+// Rute publik pembacaan dan pencarian artikel (hanya artikel published)
+articleRouter.get('/', listPublicArticles);
 
 articleRouter.get('/user/my-articles', authenticateUser, async (req, res) => {
   try {
@@ -94,69 +58,45 @@ articleRouter.get('/user/my-comments', authenticateUser, async (req, res) => {
   }
 });
 
-articleRouter.get('/:id', async (req, res) => {
-  const { id } = req.params;
+articleRouter.get('/:id', validateArticleIdParam, getPublicArticleById);
 
-  try {
-    const articleRes = await pool.query(
-      `SELECT a.id, a.user_id, a.title, a.description, a.image_url, a.category, a.status, a.created_at,
-              u.name AS author_name
-       FROM articles a
-       JOIN users u ON a.user_id = u.id
-       WHERE a.id = $1`,
-      [id]
-    );
+// Rute CRUD Artikel Admin (Deny by default: wajib terautentikasi & role admin)
+articleRouter.post(
+  '/',
+  authenticateUser,
+  requireAdmin,
+  validateCreateArticleInput,
+  createArticle
+);
 
-    if (articleRes.rows.length === 0) {
-      return res.status(404).json({ detail: 'Artikel tidak ditemukan.' });
-    }
+articleRouter.put(
+  '/:id',
+  authenticateUser,
+  requireAdmin,
+  validateArticleIdParam,
+  validateCreateArticleInput,
+  updateArticle
+);
 
-    const commentsRes = await pool.query(
-      `SELECT c.id, c.user_id, c.content, c.created_at,
-              u.name AS author_name
-       FROM article_comments c
-       JOIN users u ON c.user_id = u.id
-       WHERE c.article_id = $1
-       ORDER BY c.created_at ASC`,
-      [id]
-    );
+articleRouter.patch(
+  '/:id',
+  authenticateUser,
+  requireAdmin,
+  validateArticleIdParam,
+  validatePatchArticleInput,
+  updateArticle
+);
 
-    return res.status(200).json({
-      article: articleRes.rows[0],
-      comments: commentsRes.rows
-    });
-  } catch (error) {
-    return res.status(500).json({ detail: 'Gagal memuat detail artikel.' });
-  }
-});
+articleRouter.delete(
+  '/:id',
+  authenticateUser,
+  requireAdmin,
+  validateArticleIdParam,
+  deleteArticle
+);
 
-articleRouter.post('/', authenticateUser, async (req, res) => {
-  const { title, description, category = 'umum', image_url } = req.body || {};
-
-  if (!title || typeof title !== 'string' || title.trim().length < 3) {
-    return res.status(400).json({ detail: 'Judul artikel minimal 3 karakter.' });
-  }
-
-  const finalImageUrl = image_url && typeof image_url === 'string' && image_url.trim()
-    ? image_url.trim()
-    : 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=800';
-
-  try {
-    const result = await pool.query(
-      `INSERT INTO articles (user_id, title, description, image_url, category, status, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, 'published', NOW(), NOW())
-       RETURNING *`,
-      [req.user.id, title.trim(), (description || '').trim(), finalImageUrl, category]
-    );
-
-    return res.status(201).json(result.rows[0]);
-  } catch (error) {
-    return res.status(500).json({ detail: 'Gagal membuat artikel.' });
-  }
-});
-
-articleRouter.post('/:id/comments', authenticateUser, async (req, res) => {
-  const { id } = req.params;
+articleRouter.post('/:id/comments', authenticateUser, validateArticleIdParam, async (req, res) => {
+  const id = req.validatedArticleId;
   const { content } = req.body || {};
 
   if (!content || typeof content !== 'string' || content.trim().length === 0) {
@@ -164,7 +104,10 @@ articleRouter.post('/:id/comments', authenticateUser, async (req, res) => {
   }
 
   try {
-    const articleCheck = await pool.query('SELECT id FROM articles WHERE id = $1', [id]);
+    const articleCheck = await pool.query(
+      "SELECT id FROM articles WHERE id = $1 AND status = 'published'",
+      [id]
+    );
     if (articleCheck.rows.length === 0) {
       return res.status(404).json({ detail: 'Artikel tidak ditemukan.' });
     }
@@ -186,7 +129,10 @@ articleRouter.post('/:id/comments', authenticateUser, async (req, res) => {
 });
 
 articleRouter.put('/comments/:commentId', authenticateUser, async (req, res) => {
-  const { commentId } = req.params;
+  const commentId = parsePositiveIntId(req.params.commentId);
+  if (!commentId) {
+    return res.status(422).json({ detail: 'Parameter ID komentar tidak valid.' });
+  }
   const { content } = req.body || {};
 
   if (!content || typeof content !== 'string' || content.trim().length === 0) {
@@ -218,7 +164,10 @@ articleRouter.put('/comments/:commentId', authenticateUser, async (req, res) => 
 });
 
 articleRouter.delete('/comments/:commentId', authenticateUser, async (req, res) => {
-  const { commentId } = req.params;
+  const commentId = parsePositiveIntId(req.params.commentId);
+  if (!commentId) {
+    return res.status(422).json({ detail: 'Parameter ID komentar tidak valid.' });
+  }
 
   try {
     const checkRes = await pool.query('SELECT user_id FROM article_comments WHERE id = $1', [commentId]);
