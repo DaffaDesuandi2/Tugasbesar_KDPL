@@ -11,7 +11,6 @@ import AdminArticlesPage from './pages/AdminArticlesPage';
 import AdminArticleCreatePage from './pages/AdminArticleCreatePage';
 import AdminArticleEditPage from './pages/AdminArticleEditPage';
 import AdminUsersPage from './pages/AdminUsersPage';
-import AdminCommentsPage from './pages/AdminCommentsPage';
 import AdminAuditLogsPage from './pages/AdminAuditLogsPage';
 import VerifyOtpPage from './pages/VerifyOtpPage';
 
@@ -136,14 +135,6 @@ export default function App() {
             element={
               <ProtectedRoute allowedRole="admin">
                 <AdminUsersPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/comments"
-            element={
-              <ProtectedRoute allowedRole="admin">
-                <AdminCommentsPage />
               </ProtectedRoute>
             }
           />

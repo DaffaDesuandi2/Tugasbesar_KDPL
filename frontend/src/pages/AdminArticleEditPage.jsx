@@ -1,104 +1,29 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import AdminLayout from '../components/AdminLayout';
+import api from '../api/axios';
 
 const CATEGORIES = [
-  { label: 'Umum', value: 'umum' },
-  { label: 'Akademik', value: 'akademik' },
-  { label: 'Teknologi', value: 'teknologi' },
-  { label: 'Karier', value: 'karier' },
-  { label: 'Kampus', value: 'kampus' },
+  { label: 'Akademik', value: 'Akademik' },
+  { label: 'Kemahasiswaan', value: 'Kemahasiswaan' },
+  { label: 'Beasiswa', value: 'Beasiswa' },
+  { label: 'Kompetisi', value: 'Kompetisi' },
+  { label: 'Pengumuman', value: 'Pengumuman' },
 ];
 
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 
-const MOCK_ARTICLES_DB = {
-  16: {
-    id: 16,
-    title: 'Tips Lolos Seleksi Magang bagi Mahasiswa',
-    category: 'karier',
-    status: 'published',
-    author_name: 'Super Admin PosTera',
-    created_at: '18 Nov 2026',
-    updated_at: '20 Nov 2026',
-    image_url: '',
-    image_name: 'sampul-magang.jpg',
-    image_meta: '184 KB · JPG',
-    description:
-      '## Persiapan CV\nSeleksi magang sering dimulai jauh sebelum wawancara. Buat CV yang **ringkas** dan relevan.\n\n- Cantumkan proyek\n- Siapkan portofolio',
-  },
-  15: {
-    id: 15,
-    title: 'Panduan Registrasi Mata Kuliah',
-    category: 'akademik',
-    status: 'published',
-    author_name: 'Super Admin PosTera',
-    created_at: '17 Nov 2026',
-    updated_at: '17 Nov 2026',
-    image_url: '',
-    image_name: 'registrasi-matkul.png',
-    image_meta: '210 KB · PNG',
-    description:
-      '## Alur Pengisian KRS\nPastikan Anda berkonsultasi dengan dosen wali sebelum melakukan finalisasi KRS di SIAKAD.\n\n- Cek jadwal perwalian\n- Periksa prasyarat mata kuliah',
-  },
-  14: {
-    id: 14,
-    title: 'Jadwal UTS Semester Ganjil',
-    category: 'akademik',
-    status: 'archived',
-    author_name: 'Super Admin PosTera',
-    created_at: '15 Nov 2026',
-    updated_at: '19 Nov 2026',
-    image_url: '',
-    image_name: 'jadwal-uts.webp',
-    image_meta: '142 KB · WEBP',
-    description:
-      '## Ketentuan Ujian\nMahasiswa wajib membawa kartu ujian dan hadir 15 menit sebelum jadwal dimulai.',
-  },
-  13: {
-    id: 13,
-    title: 'Pengumuman Lomba Karya Tulis',
-    category: 'kampus',
-    status: 'published',
-    author_name: 'Super Admin PosTera',
-    created_at: '14 Nov 2026',
-    updated_at: '14 Nov 2026',
-    image_url: '',
-    image_name: 'lomba-kti.jpg',
-    image_meta: '320 KB · JPG',
-    description:
-      '## Pendaftaran Tim\nBuka kesempatan bagi seluruh mahasiswa aktif untuk mengirimkan abstrak karya tulis ilmiah tingkat nasional.',
-  },
-  12: {
-    id: 12,
-    title: 'Opini Kampus Mahasiswa',
-    category: 'umum',
-    status: 'archived',
-    author_name: 'Super Admin PosTera',
-    created_at: '12 Nov 2026',
-    updated_at: '12 Nov 2026',
-    image_url: '',
-    image_name: 'opini-kampus.jpg',
-    image_meta: '195 KB · JPG',
-    description:
-      '## Ruang Diskusi Terbuka\nTulisan opini mahasiswa mengenai budaya literasi digital dan kolaborasi lintas program studi.',
-  },
-  11: {
-    id: 11,
-    title: 'Belajar Desain UI untuk Pemula',
-    category: 'teknologi',
-    status: 'published',
-    author_name: 'Super Admin PosTera',
-    created_at: '10 Nov 2026',
-    updated_at: '10 Nov 2026',
-    image_url: '',
-    image_name: 'desain-ui.png',
-    image_meta: '275 KB · PNG',
-    description:
-      '## Dasar Hirarki Visual\nPelajari cara mengatur tipografi, kontras warna, dan jarak antar elemen agar antarmuka nyaman digunakan.',
-  },
-};
+function formatDateID(dateString) {
+  if (!dateString) return '-';
+  const parsed = new Date(dateString);
+  if (Number.isNaN(parsed.getTime())) return dateString;
+  return parsed.toLocaleDateString('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+}
 
 function SafeMarkdownPreview({ content }) {
   if (!content.trim()) {
@@ -174,8 +99,8 @@ export default function AdminArticleEditPage() {
   const [initialData, setInitialData] = useState(null);
 
   const [title, setTitle] = useState('');
-  const [category, setCategory] = useState('umum');
-  const [coverTab, setCoverTab] = useState('upload');
+  const [category, setCategory] = useState('Akademik');
+  const [coverTab, setCoverTab] = useState('url');
   const [imageUrlInput, setImageUrlInput] = useState('');
   const [currentImage, setCurrentImage] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -214,42 +139,50 @@ export default function AdminArticleEditPage() {
       }
 
       try {
-        await new Promise((resolve) => setTimeout(resolve, 250));
+        const res = await api.get(`/api/admin/articles/${numericId}`);
         if (!isMounted) return;
 
-        const found = MOCK_ARTICLES_DB[numericId];
-        if (!found) {
+        const found = res.data?.article || res.data;
+        if (!found || !found.id) {
           setNotFound(true);
           return;
         }
 
-        const initialImageState = {
-          previewUrl: found.image_url || '',
-          name: found.image_name || `sampul-artikel-${found.id}.jpg`,
-          meta: found.image_meta || '184 KB · JPG',
-          isObjectUrl: false,
-          isExisting: true,
-        };
+        const matchedCat =
+          CATEGORIES.find(
+            (c) => c.value.toLowerCase() === (found.category || '').toLowerCase()
+          )?.value || 'Akademik';
 
-        setTitle(found.title);
-        setCategory(found.category);
-        setStatus(found.status);
-        setDescription(found.description);
+        const initialImageUrl = found.image_url || '';
+        const initialImageState = initialImageUrl
+          ? {
+              previewUrl: initialImageUrl,
+              name: `sampul-artikel-${found.id}`,
+              meta: 'Gambar tersimpan',
+              isObjectUrl: false,
+            }
+          : null;
+
+        setTitle(found.title || '');
+        setCategory(matchedCat);
+        setStatus(found.status || 'published');
+        setDescription(found.description || '');
         setCurrentImage(initialImageState);
-        setImageUrlInput(found.image_url || '');
+        setImageUrlInput(initialImageUrl);
+        setCoverTab(initialImageUrl ? 'url' : 'upload');
         setArticleMeta({
           id: found.id,
-          author_name: found.author_name,
-          created_at: found.created_at,
-          updated_at: found.updated_at,
+          author_name: found.author_name || 'Admin PosTera',
+          created_at: formatDateID(found.created_at),
+          updated_at: formatDateID(found.updated_at),
         });
 
         setInitialData({
-          title: found.title,
-          category: found.category,
-          status: found.status,
-          description: found.description,
-          imageKey: initialImageState.name,
+          title: found.title || '',
+          category: matchedCat,
+          status: found.status || 'published',
+          description: found.description || '',
+          imageKey: initialImageUrl,
         });
       } catch {
         if (isMounted) setNotFound(true);
@@ -266,7 +199,7 @@ export default function AdminArticleEditPage() {
 
   useEffect(() => {
     return () => {
-      if (currentImage?.isObjectUrl && currentImage?.previewUrl) {
+      if (currentImage?.isObjectUrl && currentImage?.previewUrl?.startsWith('blob:')) {
         URL.revokeObjectURL(currentImage.previewUrl);
       }
     };
@@ -275,7 +208,7 @@ export default function AdminArticleEditPage() {
   const isValidHttpsUrl = (value) => {
     try {
       const parsed = new URL(value.trim());
-      return parsed.protocol === 'https:';
+      return parsed.protocol === 'https:' || parsed.protocol === 'data:';
     } catch {
       return false;
     }
@@ -288,16 +221,16 @@ export default function AdminArticleEditPage() {
 
   const currentImageKey =
     coverTab === 'upload'
-      ? currentImage?.name || ''
+      ? currentImage?.previewUrl || ''
       : imageUrlInput.trim();
 
   const isDirty = Boolean(
     initialData &&
-    (title !== initialData.title ||
-      category !== initialData.category ||
-      status !== initialData.status ||
-      description !== initialData.description ||
-      currentImageKey !== initialData.imageKey)
+      (title !== initialData.title ||
+        category !== initialData.category ||
+        status !== initialData.status ||
+        description !== initialData.description ||
+        currentImageKey !== initialData.imageKey)
   );
 
   useEffect(() => {
@@ -346,30 +279,36 @@ export default function AdminArticleEditPage() {
     }
 
     setIsUploadingImage(true);
-    setUploadProgress(25);
+    setUploadProgress(30);
 
-    setTimeout(() => setUploadProgress(70), 150);
-    setTimeout(() => {
-      if (currentImage?.isObjectUrl && currentImage?.previewUrl) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (currentImage?.isObjectUrl && currentImage?.previewUrl?.startsWith('blob:')) {
         URL.revokeObjectURL(currentImage.previewUrl);
       }
 
-      const previewUrl = URL.createObjectURL(file);
+      setUploadProgress(100);
       setCurrentImage({
         rawFile: file,
-        previewUrl,
+        previewUrl: reader.result,
         name: file.name,
         meta: `${formatFileSize(file.size)} · ${getFileExtensionLabel(file.type)}`,
-        isObjectUrl: true,
-        isExisting: false,
+        isObjectUrl: false,
       });
-      setUploadProgress(100);
       setIsUploadingImage(false);
-    }, 350);
+    };
+    reader.onerror = () => {
+      setIsUploadingImage(false);
+      setErrors((prev) => ({
+        ...prev,
+        image: 'Gagal membaca file gambar.',
+      }));
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleRemoveImage = () => {
-    if (currentImage?.isObjectUrl && currentImage?.previewUrl) {
+    if (currentImage?.isObjectUrl && currentImage?.previewUrl?.startsWith('blob:')) {
       URL.revokeObjectURL(currentImage.previewUrl);
     }
     setCurrentImage(null);
@@ -412,9 +351,20 @@ export default function AdminArticleEditPage() {
     if (!isDirty || !hasValidImage) return;
     if (!validateForm()) return;
 
+    const finalImageUrl =
+      coverTab === 'upload'
+        ? currentImage?.previewUrl || ''
+        : imageUrlInput.trim();
+
     setIsSubmitting(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 400));
+      await api.put(`/api/admin/articles/${articleMeta.id}`, {
+        title: title.trim(),
+        category,
+        status,
+        description: description.trim(),
+        image_url: finalImageUrl,
+      });
 
       const isArchivedNow =
         initialData?.status !== 'archived' && status === 'archived';
@@ -427,10 +377,10 @@ export default function AdminArticleEditPage() {
             : 'Perubahan disimpan',
         },
       });
-    } catch {
+    } catch (err) {
       setErrors((prev) => ({
         ...prev,
-        submit: 'Gagal menyimpan perubahan. Coba lagi.',
+        submit: err.message || 'Gagal menyimpan perubahan. Coba lagi.',
       }));
     } finally {
       setIsSubmitting(false);
@@ -540,10 +490,11 @@ export default function AdminArticleEditPage() {
                         if (errors.title) setErrors((prev) => ({ ...prev, title: '' }));
                       }}
                       placeholder="Judul artikel..."
-                      className={`w-full min-h-11 px-3 bg-white border rounded-md text-[15px] text-[#1F2937] placeholder:text-[#4B5563] outline-none transition ${errors.title
+                      className={`w-full min-h-11 px-3 bg-white border rounded-md text-[15px] text-[#1F2937] placeholder:text-[#4B5563] outline-none transition ${
+                        errors.title
                           ? 'border-[#B91C1C]'
                           : `border-[#9CA3AF] ${inputFocusClass}`
-                        }`}
+                      }`}
                     />
                     {errors.title ? (
                       <p className="text-[13px] text-[#B91C1C] mt-1">{errors.title}</p>
@@ -574,7 +525,7 @@ export default function AdminArticleEditPage() {
                       ))}
                     </select>
                     <p className="text-xs text-[#4B5563] mt-1">
-                      Bawaan: Umum
+                      Bawaan: Akademik
                     </p>
                   </div>
 
@@ -590,10 +541,11 @@ export default function AdminArticleEditPage() {
                             setCoverTab('upload');
                             setErrors((prev) => ({ ...prev, image: '' }));
                           }}
-                          className={`px-3.5 py-1.5 rounded-md text-[13px] font-semibold transition-colors cursor-pointer ${coverTab === 'upload'
+                          className={`px-3.5 py-1.5 rounded-md text-[13px] font-semibold transition-colors cursor-pointer ${
+                            coverTab === 'upload'
                               ? 'bg-[#E0F2FE] text-[#0C4A6E]'
                               : 'bg-transparent text-[#4B5563] hover:bg-gray-100'
-                            }`}
+                          }`}
                         >
                           Unggah File
                         </button>
@@ -603,10 +555,11 @@ export default function AdminArticleEditPage() {
                             setCoverTab('url');
                             setErrors((prev) => ({ ...prev, image: '' }));
                           }}
-                          className={`px-3.5 py-1.5 rounded-md text-[13px] font-semibold transition-colors cursor-pointer ${coverTab === 'url'
+                          className={`px-3.5 py-1.5 rounded-md text-[13px] font-semibold transition-colors cursor-pointer ${
+                            coverTab === 'url'
                               ? 'bg-[#E0F2FE] text-[#0C4A6E]'
                               : 'bg-transparent text-[#4B5563] hover:bg-gray-100'
-                            }`}
+                          }`}
                         >
                           Tautan URL
                         </button>
@@ -710,12 +663,13 @@ export default function AdminArticleEditPage() {
                               setIsDragging(false);
                               handleProcessFile(e.dataTransfer.files?.[0]);
                             }}
-                            className={`h-37.5 rounded-[10px] px-4 flex flex-col items-center justify-center gap-2 text-center cursor-pointer transition-colors ${isDragging
+                            className={`h-37.5 rounded-[10px] px-4 flex flex-col items-center justify-center gap-2 text-center cursor-pointer transition-colors ${
+                              isDragging
                                 ? 'border-2 border-solid border-[#0369A1] bg-[#E0F2FE]'
                                 : errors.image
-                                  ? 'border-2 border-dashed border-[#B91C1C] bg-[#F9FAFB]'
-                                  : 'border-2 border-dashed border-[#9CA3AF] bg-[#F9FAFB] hover:border-[#0369A1]'
-                              }`}
+                                ? 'border-2 border-dashed border-[#B91C1C] bg-[#F9FAFB]'
+                                : 'border-2 border-dashed border-[#9CA3AF] bg-[#F9FAFB] hover:border-[#0369A1]'
+                            }`}
                           >
                             <svg
                               xmlns="http://www.w3.org/2000/svg"
@@ -765,10 +719,11 @@ export default function AdminArticleEditPage() {
                             if (errors.image) setErrors((prev) => ({ ...prev, image: '' }));
                           }}
                           placeholder="https://..."
-                          className={`w-full min-h-11 px-3 bg-white border rounded-md text-[15px] text-[#1F2937] placeholder:text-[#4B5563] outline-none transition ${errors.image
+                          className={`w-full min-h-11 px-3 bg-white border rounded-md text-[15px] text-[#1F2937] placeholder:text-[#4B5563] outline-none transition ${
+                            errors.image
                               ? 'border-[#B91C1C]'
                               : `border-[#9CA3AF] ${inputFocusClass}`
-                            }`}
+                          }`}
                         />
                         {errors.image ? (
                           <p className="text-[13px] text-[#B91C1C] mt-1">{errors.image}</p>
@@ -799,16 +754,18 @@ export default function AdminArticleEditPage() {
                       <button
                         type="button"
                         onClick={() => setStatus('published')}
-                        className={`flex-1 text-left rounded-lg flex items-start gap-3 transition-colors cursor-pointer ${status === 'published'
+                        className={`flex-1 text-left rounded-lg flex items-start gap-3 transition-colors cursor-pointer ${
+                          status === 'published'
                             ? 'border-2 border-[#0369A1] bg-[#E0F2FE] p-3.5'
                             : 'border border-[#9CA3AF] bg-white p-3.75 hover:bg-gray-50'
-                          }`}
+                        }`}
                       >
                         <span
-                          className={`w-4.5 h-4.5 rounded-full border-2 bg-white flex items-center justify-center shrink-0 mt-0.5 ${status === 'published'
+                          className={`w-4.5 h-4.5 rounded-full border-2 bg-white flex items-center justify-center shrink-0 mt-0.5 ${
+                            status === 'published'
                               ? 'border-[#0369A1]'
                               : 'border-[#9CA3AF]'
-                            }`}
+                          }`}
                         >
                           {status === 'published' && (
                             <span className="w-2 h-2 rounded-full bg-[#0369A1]" />
@@ -827,16 +784,18 @@ export default function AdminArticleEditPage() {
                       <button
                         type="button"
                         onClick={() => setStatus('archived')}
-                        className={`flex-1 text-left rounded-lg flex items-start gap-3 transition-colors cursor-pointer ${status === 'archived'
+                        className={`flex-1 text-left rounded-lg flex items-start gap-3 transition-colors cursor-pointer ${
+                          status === 'archived'
                             ? 'border-2 border-[#0369A1] bg-[#E0F2FE] p-3.5'
                             : 'border border-[#9CA3AF] bg-white p-3.75 hover:bg-gray-50'
-                          }`}
+                        }`}
                       >
                         <span
-                          className={`w-4.5 h-4.5 rounded-full border-2 bg-white flex items-center justify-center shrink-0 mt-0.5 ${status === 'archived'
+                          className={`w-4.5 h-4.5 rounded-full border-2 bg-white flex items-center justify-center shrink-0 mt-0.5 ${
+                            status === 'archived'
                               ? 'border-[#0369A1]'
                               : 'border-[#9CA3AF]'
-                            }`}
+                          }`}
                         >
                           {status === 'archived' && (
                             <span className="w-2 h-2 rounded-full bg-[#0369A1]" />
@@ -866,20 +825,22 @@ export default function AdminArticleEditPage() {
                         <button
                           type="button"
                           onClick={() => setEditorTab('write')}
-                          className={`px-3.5 py-1.5 rounded-md text-[13px] font-semibold transition-colors cursor-pointer ${editorTab === 'write'
+                          className={`px-3.5 py-1.5 rounded-md text-[13px] font-semibold transition-colors cursor-pointer ${
+                            editorTab === 'write'
                               ? 'bg-[#E0F2FE] text-[#0C4A6E]'
                               : 'bg-transparent text-[#4B5563] hover:bg-gray-100'
-                            }`}
+                          }`}
                         >
                           Tulis
                         </button>
                         <button
                           type="button"
                           onClick={() => setEditorTab('preview')}
-                          className={`px-3.5 py-1.5 rounded-md text-[13px] font-semibold transition-colors cursor-pointer ${editorTab === 'preview'
+                          className={`px-3.5 py-1.5 rounded-md text-[13px] font-semibold transition-colors cursor-pointer ${
+                            editorTab === 'preview'
                               ? 'bg-[#E0F2FE] text-[#0C4A6E]'
                               : 'bg-transparent text-[#4B5563] hover:bg-gray-100'
-                            }`}
+                          }`}
                         >
                           Pratinjau
                         </button>
@@ -897,10 +858,11 @@ export default function AdminArticleEditPage() {
                           }
                         }}
                         placeholder="Tulis isi artikel dengan Markdown..."
-                        className={`w-full min-h-42.5 p-3 bg-white border rounded-md text-[15px] leading-[1.7] text-[#1F2937] placeholder:text-[#4B5563] outline-none resize-y transition ${errors.description
+                        className={`w-full min-h-42.5 p-3 bg-white border rounded-md text-[15px] leading-[1.7] text-[#1F2937] placeholder:text-[#4B5563] outline-none resize-y transition ${
+                          errors.description
                             ? 'border-[#B91C1C]'
                             : `border-[#9CA3AF] ${inputFocusClass}`
-                          }`}
+                        }`}
                       />
                     ) : (
                       <div className="w-full min-h-42.5 p-3 bg-[#F9FAFB] border border-[#9CA3AF] rounded-md">

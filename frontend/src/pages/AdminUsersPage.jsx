@@ -3,63 +3,6 @@ import AdminLayout from '../components/AdminLayout';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
 
-const INITIAL_USERS = [
-  {
-    id: 106,
-    name: 'ragilbayu',
-    email: 'ragilbayu@student.itera.ac.id',
-    role: 'mahasiswa',
-    failed_login_attempts: 0,
-    created_at: '12 Okt 2026',
-    is_active: true,
-  },
-  {
-    id: 105,
-    name: 'dinaputri',
-    email: 'dinaputri@student.itera.ac.id',
-    role: 'mahasiswa',
-    failed_login_attempts: 0,
-    created_at: '14 Okt 2026',
-    is_active: true,
-  },
-  {
-    id: 104,
-    name: 'fajarnur',
-    email: 'fajarnur@student.itera.ac.id',
-    role: 'mahasiswa',
-    failed_login_attempts: 3,
-    created_at: '20 Okt 2026',
-    is_active: true,
-  },
-  {
-    id: 103,
-    name: 'sariintan',
-    email: 'sariintan@student.itera.ac.id',
-    role: 'mahasiswa',
-    failed_login_attempts: 0,
-    created_at: '02 Nov 2026',
-    is_active: false,
-  },
-  {
-    id: 102,
-    name: 'budisantoso',
-    email: 'budisantoso@student.itera.ac.id',
-    role: 'mahasiswa',
-    failed_login_attempts: 5,
-    created_at: '05 Nov 2026',
-    is_active: true,
-  },
-  {
-    id: 1,
-    name: 'Super Admin PosTera',
-    email: 'admin@postera.ac.id',
-    role: 'admin',
-    failed_login_attempts: 0,
-    created_at: '01 Okt 2026',
-    is_active: true,
-  },
-];
-
 function getInitials(name) {
   if (!name) return 'U';
   const cleaned = name.trim();
@@ -74,6 +17,17 @@ function getFailedLoginColor(count) {
   if (count >= 5) return 'text-[#B91C1C]';
   if (count >= 3) return 'text-[#B45309]';
   return 'text-[#4B5563]';
+}
+
+function formatDateID(dateString) {
+  if (!dateString) return '-';
+  const parsed = new Date(dateString);
+  if (Number.isNaN(parsed.getTime())) return dateString;
+  return parsed.toLocaleDateString('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
 }
 
 export default function AdminUsersPage() {
@@ -102,7 +56,6 @@ export default function AdminUsersPage() {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  // Mengambil daftar pengguna dari backend API saat halaman pertama kali dibuka
   useEffect(() => {
     let isMounted = true;
 
@@ -110,18 +63,18 @@ export default function AdminUsersPage() {
       setIsLoading(true);
       setHasError(false);
       try {
-        // Memanggil endpoint backend GET /api/admin/users
-        const response = await api.get('/api/admin/users');
+        const res = await api.get('/api/admin/users');
         if (!isMounted) return;
 
-        // Simpan daftar pengguna asli dari database ke state
-        setUsers(response.data.users || []);
-      } catch (err) {
-        console.error('Gagal mengambil data pengguna dari backend:', err);
-        if (isMounted) {
-          // Fallback: Jika backend offline, tetap tampilkan data awal agar UI tidak crash
-          setUsers(INITIAL_USERS);
-        }
+        const rawUsers = res.data?.users || [];
+        const normalizedUsers = rawUsers.map((item) => ({
+          ...item,
+          failed_login_attempts: item.failed_login_attempts ?? 0,
+          created_at: formatDateID(item.created_at),
+        }));
+        setUsers(normalizedUsers);
+      } catch {
+        if (isMounted) setHasError(true);
       } finally {
         if (isMounted) setIsLoading(false);
       }
@@ -157,15 +110,15 @@ export default function AdminUsersPage() {
         statusFilter === 'all'
           ? true
           : statusFilter === 'active'
-            ? item.is_active
-            : !item.is_active;
+          ? item.is_active
+          : !item.is_active;
 
       const keyword = debouncedSearch.toLowerCase();
       const matchSearch =
         !keyword
           ? true
-          : item.name.toLowerCase().includes(keyword) ||
-          item.email.toLowerCase().includes(keyword);
+          : (item.name || '').toLowerCase().includes(keyword) ||
+            (item.email || '').toLowerCase().includes(keyword);
 
       return matchStatus && matchSearch;
     });
@@ -192,7 +145,7 @@ export default function AdminUsersPage() {
     setTogglingUserId(targetUser.id);
     try {
       await api.patch(`/api/admin/users/${targetUser.id}/status`, {
-        is_active: nextIsActive
+        is_active: nextIsActive,
       });
 
       setUsers((prev) =>
@@ -201,20 +154,15 @@ export default function AdminUsersPage() {
         )
       );
 
-      // Tampilkan notifikasi toast sukses
       setToast({
         message: nextIsActive
           ? `Akun ${targetUser.name} berhasil diaktifkan.`
           : `Akun ${targetUser.name} berhasil dinonaktifkan.`,
         variant: 'default',
       });
-
     } catch (err) {
-      console.error('Gagal memperbarui status pengguna:', err);
-      // Tampilkan pesan galat spesifik dari backend jika gagal
-      const errorMsg = err.response?.data?.detail || 'Gagal mengubah status pengguna. Coba lagi.';
       setToast({
-        message: errorMsg,
+        message: err.message || 'Gagal mengubah status pengguna. Coba lagi.',
         variant: 'error',
       });
     } finally {
@@ -264,10 +212,11 @@ export default function AdminUsersPage() {
           <button
             type="button"
             onClick={() => handleStatusFilterChange('all')}
-            className={`px-4 py-1.75 rounded-full text-sm font-semibold border transition-colors cursor-pointer ${statusFilter === 'all'
-              ? 'bg-[#0369A1] text-white border-[#0369A1]'
-              : 'bg-white text-[#1F2937] border-[#D1D5DB] hover:bg-gray-50'
-              }`}
+            className={`px-4 py-1.75 rounded-full text-sm font-semibold border transition-colors cursor-pointer ${
+              statusFilter === 'all'
+                ? 'bg-[#0369A1] text-white border-[#0369A1]'
+                : 'bg-white text-[#1F2937] border-[#D1D5DB] hover:bg-gray-50'
+            }`}
           >
             Semua ({counts.all.toLocaleString('id-ID')})
           </button>
@@ -275,10 +224,11 @@ export default function AdminUsersPage() {
           <button
             type="button"
             onClick={() => handleStatusFilterChange('active')}
-            className={`px-4 py-1.75 rounded-full text-sm font-semibold border transition-colors cursor-pointer ${statusFilter === 'active'
-              ? 'bg-[#0369A1] text-white border-[#0369A1]'
-              : 'bg-white text-[#1F2937] border-[#D1D5DB] hover:bg-gray-50'
-              }`}
+            className={`px-4 py-1.75 rounded-full text-sm font-semibold border transition-colors cursor-pointer ${
+              statusFilter === 'active'
+                ? 'bg-[#0369A1] text-white border-[#0369A1]'
+                : 'bg-white text-[#1F2937] border-[#D1D5DB] hover:bg-gray-50'
+            }`}
           >
             Aktif ({counts.active.toLocaleString('id-ID')})
           </button>
@@ -286,10 +236,11 @@ export default function AdminUsersPage() {
           <button
             type="button"
             onClick={() => handleStatusFilterChange('inactive')}
-            className={`px-4 py-1.75 rounded-full text-sm font-semibold border transition-colors cursor-pointer ${statusFilter === 'inactive'
-              ? 'bg-[#0369A1] text-white border-[#0369A1]'
-              : 'bg-white text-[#1F2937] border-[#D1D5DB] hover:bg-gray-50'
-              }`}
+            className={`px-4 py-1.75 rounded-full text-sm font-semibold border transition-colors cursor-pointer ${
+              statusFilter === 'inactive'
+                ? 'bg-[#0369A1] text-white border-[#0369A1]'
+                : 'bg-white text-[#1F2937] border-[#D1D5DB] hover:bg-gray-50'
+            }`}
           >
             Nonaktif ({counts.inactive.toLocaleString('id-ID')})
           </button>
@@ -402,12 +353,13 @@ export default function AdminUsersPage() {
                                 ? 'Akun Admin tidak dapat dinonaktifkan dari panel ini'
                                 : undefined
                             }
-                            className={`inline-flex items-center gap-2 ${isAdminRole
-                              ? 'opacity-45 cursor-not-allowed'
-                              : isRowToggling
+                            className={`inline-flex items-center gap-2 ${
+                              isAdminRole
+                                ? 'opacity-45 cursor-not-allowed'
+                                : isRowToggling
                                 ? 'opacity-60 cursor-not-allowed'
                                 : ''
-                              }`}
+                            }`}
                           >
                             <button
                               type="button"
@@ -416,23 +368,27 @@ export default function AdminUsersPage() {
                               aria-label={`Ubah status aktif untuk ${rowUser.name}`}
                               disabled={isAdminRole || isRowToggling}
                               onClick={() => handleSwitchClick(rowUser)}
-                              className={`relative w-10 h-5.5 rounded-[11px] transition-colors shrink-0 ${rowUser.is_active ? 'bg-[#0369A1]' : 'bg-[#9CA3AF]'
-                                } ${isAdminRole || isRowToggling
+                              className={`relative w-10 h-5.5 rounded-[11px] transition-colors shrink-0 ${
+                                rowUser.is_active ? 'bg-[#0369A1]' : 'bg-[#9CA3AF]'
+                              } ${
+                                isAdminRole || isRowToggling
                                   ? 'cursor-not-allowed'
                                   : 'cursor-pointer'
-                                }`}
+                              }`}
                             >
                               <span
-                                className={`absolute top-0.5 w-4.5 h-4.5 rounded-full bg-white transition-transform ${rowUser.is_active ? 'left-5' : 'left-0.5'
-                                  }`}
+                                className={`absolute top-0.5 w-4.5 h-4.5 rounded-full bg-white transition-transform ${
+                                  rowUser.is_active ? 'left-5' : 'left-0.5'
+                                }`}
                               />
                             </button>
 
                             <span
-                              className={`text-[13px] font-semibold ${rowUser.is_active
-                                ? 'text-[#166534]'
-                                : 'text-[#4B5563]'
-                                }`}
+                              className={`text-[13px] font-semibold ${
+                                rowUser.is_active
+                                  ? 'text-[#166534]'
+                                  : 'text-[#4B5563]'
+                              }`}
                             >
                               {rowUser.is_active ? 'Aktif' : 'Nonaktif'}
                             </span>
@@ -471,10 +427,11 @@ export default function AdminUsersPage() {
                     key={page}
                     type="button"
                     onClick={() => setCurrentPage(page)}
-                    className={`min-w-9 h-9 px-2 rounded-full text-sm font-semibold border transition-colors cursor-pointer ${safePage === page
-                      ? 'bg-[#0C4A6E] text-white border-[#0C4A6E]'
-                      : 'bg-white text-[#1F2937] border-gray-300 hover:bg-gray-50'
-                      }`}
+                    className={`min-w-9 h-9 px-2 rounded-full text-sm font-semibold border transition-colors cursor-pointer ${
+                      safePage === page
+                        ? 'bg-[#0C4A6E] text-white border-[#0C4A6E]'
+                        : 'bg-white text-[#1F2937] border-gray-300 hover:bg-gray-50'
+                    }`}
                   >
                     {page}
                   </button>
@@ -537,8 +494,9 @@ export default function AdminUsersPage() {
       {toast && (
         <div
           role="status"
-          className={`fixed bottom-5 right-5 z-50 text-white text-sm px-4 py-3 rounded-lg shadow-lg ${toast.variant === 'error' ? 'bg-[#B91C1C]' : 'bg-[#1F2937]'
-            }`}
+          className={`fixed bottom-5 right-5 z-50 text-white text-sm px-4 py-3 rounded-lg shadow-lg ${
+            toast.variant === 'error' ? 'bg-[#B91C1C]' : 'bg-[#1F2937]'
+          }`}
         >
           {toast.message}
         </div>
