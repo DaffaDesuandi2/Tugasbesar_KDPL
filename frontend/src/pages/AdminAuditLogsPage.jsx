@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import AdminLayout from '../components/AdminLayout';
+import api from '../api/axios';
 
 const ACTION_OPTIONS = [
   'Semua',
@@ -22,6 +23,7 @@ const ACTION_BADGE_STYLES = {
   CREATE: 'bg-[#E0F2FE] text-[#0C4A6E]',
   UPDATE: 'bg-[#E0F2FE] text-[#0C4A6E]',
   DELETE: 'bg-[#FEE2E2] text-[#B91C1C]',
+  TOGGLE_USER: 'bg-[#FEF3C7] text-[#92400E]',
   TOGGLE_USER_STATUS: 'bg-[#FEF3C7] text-[#92400E]',
 };
 
@@ -88,9 +90,11 @@ export default function AdminAuditLogsPage() {
       setIsLoading(true);
       setHasError(false);
       try {
-        await new Promise((resolve) => setTimeout(resolve, 250));
+        const res = await api.get('/api/admin/audit-logs', {
+          params: { page: 1, limit: 200 },
+        });
         if (!isMounted) return;
-        setLogs(INITIAL_AUDIT_LOGS);
+        setLogs(res.data?.logs || []);
       } catch {
         if (isMounted) setHasError(true);
       } finally {
@@ -118,7 +122,8 @@ export default function AdminAuditLogsPage() {
         !keyword
           ? true
           : (item.user_name || '').toLowerCase().includes(keyword) ||
-          (item.ip_address || '').toLowerCase().includes(keyword);
+            (item.ip_address || '').toLowerCase().includes(keyword) ||
+            (item.detail || '').toLowerCase().includes(keyword);
 
       return matchAction && matchEntity && matchFrom && matchTo && matchSearch;
     });
@@ -349,10 +354,11 @@ export default function AdminAuditLogsPage() {
                     key={page}
                     type="button"
                     onClick={() => setCurrentPage(page)}
-                    className={`min-w-9 h-9 px-2 rounded-full text-sm font-semibold border transition-colors cursor-pointer ${safePage === page
-                      ? 'bg-[#0C4A6E] text-white border-[#0C4A6E]'
-                      : 'bg-white text-[#1F2937] border-gray-300 hover:bg-gray-50'
-                      }`}
+                    className={`min-w-9 h-9 px-2 rounded-full text-sm font-semibold border transition-colors cursor-pointer ${
+                      safePage === page
+                        ? 'bg-[#0C4A6E] text-white border-[#0C4A6E]'
+                        : 'bg-white text-[#1F2937] border-gray-300 hover:bg-gray-50'
+                    }`}
                   >
                     {page}
                   </button>

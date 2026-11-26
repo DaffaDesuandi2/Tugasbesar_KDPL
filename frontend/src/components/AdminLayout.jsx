@@ -6,7 +6,6 @@ const ADMIN_MENU = [
   { label: 'Dashboard', to: '/admin/dashboard', end: true },
   { label: 'Kelola Artikel', to: '/admin/articles', end: false },
   { label: 'Kelola Pengguna', to: '/admin/users', end: false },
-  { label: 'Moderasi Komentar', to: '/admin/comments', end: false },
   { label: 'Audit Log', to: '/admin/audit-logs', end: false },
 ];
 

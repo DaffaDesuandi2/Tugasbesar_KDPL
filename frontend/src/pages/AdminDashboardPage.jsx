@@ -1,77 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import AdminLayout from '../components/AdminLayout';
-
-const MOCK_ADMIN_STATS = {
-  total_students: 1248,
-  published_articles: 386,
-  total_comments: 2917,
-  failed_logins_24h: 37,
-};
-
-const MOCK_RECENT_ARTICLES = [
-  {
-    id: 16,
-    title: 'Tips Lolos Seleksi Magang',
-    status: 'published',
-    updated_at: '18 Nov 2026',
-    image_url: '',
-  },
-  {
-    id: 15,
-    title: 'Panduan Registrasi Mata Kuliah',
-    status: 'published',
-    updated_at: '17 Nov 2026',
-    image_url: '',
-  },
-  {
-    id: 14,
-    title: 'Jadwal UTS Semester Ganjil',
-    status: 'archived',
-    updated_at: '15 Nov 2026',
-    image_url: '',
-  },
-  {
-    id: 13,
-    title: 'Pengumuman Lomba Karya Tulis',
-    status: 'published',
-    updated_at: '14 Nov 2026',
-    image_url: '',
-  },
-];
-
-const MOCK_RECENT_LOGS = [
-  {
-    id: 901,
-    action: 'TOGGLE_USER',
-    details: 'Menonaktifkan fajarnur',
-    time: '10:42',
-  },
-  {
-    id: 902,
-    action: 'LOGIN_FAILED',
-    details: 'Kredensial tidak cocok - 198.51.100.23',
-    time: '10:28',
-  },
-  {
-    id: 903,
-    action: 'UPDATE',
-    details: 'Mengubah artikel #14',
-    time: '10:15',
-  },
-  {
-    id: 904,
-    action: 'DELETE',
-    details: 'Menghapus komentar #482',
-    time: '09:50',
-  },
-  {
-    id: 905,
-    action: 'CREATE',
-    details: 'Menambah artikel #16',
-    time: '09:20',
-  },
-];
+import api from '../api/axios';
 
 function ArticleThumbnail({ imageUrl, title }) {
   const [imgError, setImgError] = useState(false);
@@ -110,7 +40,12 @@ function ArticleThumbnail({ imageUrl, title }) {
 }
 
 export default function AdminDashboardPage() {
-  const [stats, setStats] = useState(MOCK_ADMIN_STATS);
+  const [stats, setStats] = useState({
+    total_students: 0,
+    published_articles: 0,
+    total_comments: 0,
+    failed_logins_24h: 0,
+  });
   const [articles, setArticles] = useState([]);
   const [logs, setLogs] = useState([]);
 
@@ -127,11 +62,19 @@ export default function AdminDashboardPage() {
       setIsLoading(true);
       setHasError(false);
       try {
-        await new Promise((resolve) => setTimeout(resolve, 250));
+        const res = await api.get('/api/admin/dashboard-stats');
         if (!isMounted) return;
-        setStats(MOCK_ADMIN_STATS);
-        setArticles(MOCK_RECENT_ARTICLES);
-        setLogs(MOCK_RECENT_LOGS);
+
+        setStats(
+          res.data?.stats || {
+            total_students: 0,
+            published_articles: 0,
+            total_comments: 0,
+            failed_logins_24h: 0,
+          }
+        );
+        setArticles(res.data?.recent_articles || []);
+        setLogs(res.data?.recent_logs || []);
       } catch {
         if (isMounted) setHasError(true);
       } finally {
@@ -152,20 +95,11 @@ export default function AdminDashboardPage() {
   const getStatusBadge = (status) => {
     switch (status) {
       case 'published':
-        return {
-          label: 'TERBIT',
-          className: 'bg-[#DCFCE7] text-[#166534]',
-        };
+        return { label: 'TERBIT', className: 'bg-[#DCFCE7] text-[#166534]' };
       case 'archived':
-        return {
-          label: 'ARSIP',
-          className: 'bg-[#E5E7EB] text-[#374151]',
-        };
+        return { label: 'ARSIP', className: 'bg-[#E5E7EB] text-[#374151]' };
       case 'rejected':
-        return {
-          label: 'DITOLAK',
-          className: 'bg-[#FEE2E2] text-[#B91C1C]',
-        };
+        return { label: 'DITOLAK', className: 'bg-[#FEE2E2] text-[#B91C1C]' };
       default:
         return {
           label: String(status || 'TERBIT').toUpperCase(),
@@ -183,6 +117,7 @@ export default function AdminDashboardPage() {
       case 'LOGIN_FAILED':
         return 'bg-[#B91C1C]';
       case 'TOGGLE_USER':
+      case 'TOGGLE_USER_STATUS':
         return 'bg-[#B45309]';
       case 'LOGIN_SUCCESS':
         return 'bg-[#16A34A]';
@@ -196,7 +131,15 @@ export default function AdminDashboardPage() {
 
     setIsDeleting(true);
     try {
+      await api.delete(`/api/admin/articles/${deleteTarget.id}`);
+
       setArticles((prev) => prev.filter((item) => item.id !== deleteTarget.id));
+      if (deleteTarget.status === 'published') {
+        setStats((prev) => ({
+          ...prev,
+          published_articles: Math.max(0, prev.published_articles - 1),
+        }));
+      }
       setLogs((prev) => [
         {
           id: Date.now(),

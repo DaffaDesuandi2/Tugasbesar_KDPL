@@ -1,109 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import AdminLayout from '../components/AdminLayout';
+import api from '../api/axios';
 
-const ARTICLE_CATEGORIES = ['Semua', 'Akademik', 'Teknologi', 'Karier', 'Kampus', 'Umum'];
-
-const INITIAL_ADMIN_ARTICLES = [
-  {
-    id: 16,
-    title: 'Tips Lolos Seleksi Magang',
-    category: 'Karier',
-    status: 'published',
-    created_at: '18 Nov 2026',
-    updated_at: '20 Nov 2026',
-    image_url: '',
-  },
-  {
-    id: 15,
-    title: 'Panduan Registrasi Mata Kuliah',
-    category: 'Akademik',
-    status: 'published',
-    created_at: '17 Nov 2026',
-    updated_at: '17 Nov 2026',
-    image_url: '',
-  },
-  {
-    id: 14,
-    title: 'Jadwal UTS Semester Ganjil',
-    category: 'Akademik',
-    status: 'archived',
-    created_at: '15 Nov 2026',
-    updated_at: '19 Nov 2026',
-    image_url: '',
-  },
-  {
-    id: 13,
-    title: 'Pengumuman Lomba Karya Tulis',
-    category: 'Kampus',
-    status: 'published',
-    created_at: '14 Nov 2026',
-    updated_at: '14 Nov 2026',
-    image_url: '',
-  },
-  {
-    id: 12,
-    title: 'Opini Kampus Mahasiswa',
-    category: 'Umum',
-    status: 'archived',
-    created_at: '12 Nov 2026',
-    updated_at: '12 Nov 2026',
-    image_url: '',
-  },
-  {
-    id: 11,
-    title: 'Belajar Desain UI untuk Pemula',
-    category: 'Teknologi',
-    status: 'published',
-    created_at: '10 Nov 2026',
-    updated_at: '10 Nov 2026',
-    image_url: '',
-  },
-  {
-    id: 10,
-    title: 'Cara Belajar Laravel dari Nol',
-    category: 'Teknologi',
-    status: 'published',
-    created_at: '08 Nov 2026',
-    updated_at: '09 Nov 2026',
-    image_url: '',
-  },
-  {
-    id: 9,
-    title: 'Review Buku Basis Data',
-    category: 'Akademik',
-    status: 'published',
-    created_at: '05 Nov 2026',
-    updated_at: '05 Nov 2026',
-    image_url: '',
-  },
-  {
-    id: 8,
-    title: 'Catatan Kuliah Jaringan Komputer',
-    category: 'Akademik',
-    status: 'published',
-    created_at: '03 Nov 2026',
-    updated_at: '03 Nov 2026',
-    image_url: '',
-  },
-  {
-    id: 7,
-    title: 'Panduan Aktif di Organisasi Kampus',
-    category: 'Kampus',
-    status: 'published',
-    created_at: '01 Nov 2026',
-    updated_at: '01 Nov 2026',
-    image_url: '',
-  },
-  {
-    id: 6,
-    title: 'Persiapan Wawancara Kerja Bidang IT',
-    category: 'Karier',
-    status: 'published',
-    created_at: '29 Okt 2026',
-    updated_at: '30 Okt 2026',
-    image_url: '',
-  },
+const ARTICLE_CATEGORIES = [
+  'Semua',
+  'Akademik',
+  'Kemahasiswaan',
+  'Beasiswa',
+  'Kompetisi',
+  'Pengumuman',
 ];
 
 function ArticleThumbnail({ imageUrl, title }) {
@@ -184,9 +90,11 @@ export default function AdminArticlesPage() {
       setIsLoading(true);
       setHasError(false);
       try {
-        await new Promise((resolve) => setTimeout(resolve, 250));
+        const res = await api.get('/api/admin/articles', {
+          params: { page: 1, limit: 200 },
+        });
         if (!isMounted) return;
-        setArticles(INITIAL_ADMIN_ARTICLES);
+        setArticles(res.data?.articles || []);
       } catch {
         if (isMounted) setHasError(true);
       } finally {
@@ -225,11 +133,11 @@ export default function AdminArticlesPage() {
       const matchCategory =
         categoryFilter === 'Semua'
           ? true
-          : item.category.toLowerCase() === categoryFilter.toLowerCase();
+          : (item.category || '').toLowerCase() === categoryFilter.toLowerCase();
       const matchSearch =
         !debouncedSearch
           ? true
-          : item.title.toLowerCase().includes(debouncedSearch.toLowerCase());
+          : (item.title || '').toLowerCase().includes(debouncedSearch.toLowerCase());
 
       return matchStatus && matchCategory && matchSearch;
     });
@@ -262,6 +170,8 @@ export default function AdminArticlesPage() {
 
     setIsDeleting(true);
     try {
+      await api.delete(`/api/admin/articles/${deleteTarget.id}`);
+
       setArticles((prev) => prev.filter((item) => item.id !== deleteTarget.id));
       setDeleteTarget(null);
       setToastMessage('Artikel dihapus');
@@ -301,10 +211,11 @@ export default function AdminArticlesPage() {
           <button
             type="button"
             onClick={() => handleStatusChange('all')}
-            className={`px-4 py-1.75 rounded-full text-sm font-semibold border transition-colors cursor-pointer ${statusFilter === 'all'
+            className={`px-4 py-1.75 rounded-full text-sm font-semibold border transition-colors cursor-pointer ${
+              statusFilter === 'all'
                 ? 'bg-[#0369A1] text-white border-[#0369A1]'
                 : 'bg-white text-[#1F2937] border-[#D1D5DB] hover:bg-gray-50'
-              }`}
+            }`}
           >
             Semua ({counts.all})
           </button>
@@ -312,10 +223,11 @@ export default function AdminArticlesPage() {
           <button
             type="button"
             onClick={() => handleStatusChange('published')}
-            className={`px-4 py-1.75 rounded-full text-sm font-semibold border transition-colors cursor-pointer ${statusFilter === 'published'
+            className={`px-4 py-1.75 rounded-full text-sm font-semibold border transition-colors cursor-pointer ${
+              statusFilter === 'published'
                 ? 'bg-[#0369A1] text-white border-[#0369A1]'
                 : 'bg-white text-[#1F2937] border-[#D1D5DB] hover:bg-gray-50'
-              }`}
+            }`}
           >
             Terbit ({counts.published})
           </button>
@@ -323,10 +235,11 @@ export default function AdminArticlesPage() {
           <button
             type="button"
             onClick={() => handleStatusChange('archived')}
-            className={`px-4 py-1.75 rounded-full text-sm font-semibold border transition-colors cursor-pointer ${statusFilter === 'archived'
+            className={`px-4 py-1.75 rounded-full text-sm font-semibold border transition-colors cursor-pointer ${
+              statusFilter === 'archived'
                 ? 'bg-[#0369A1] text-white border-[#0369A1]'
                 : 'bg-white text-[#1F2937] border-[#D1D5DB] hover:bg-gray-50'
-              }`}
+            }`}
           >
             Arsip ({counts.archived})
           </button>
@@ -434,10 +347,11 @@ export default function AdminArticlesPage() {
 
                         <td className="px-3 py-2.5 align-middle whitespace-nowrap">
                           <span
-                            className={`inline-block uppercase text-xs font-bold px-3 py-1.25 rounded-full ${isPublished
+                            className={`inline-block uppercase text-xs font-bold px-3 py-1.25 rounded-full ${
+                              isPublished
                                 ? 'bg-[#DCFCE7] text-[#166534]'
                                 : 'bg-[#E5E7EB] text-[#374151]'
-                              }`}
+                            }`}
                           >
                             {isPublished ? 'TERBIT' : 'ARSIP'}
                           </span>
@@ -499,10 +413,11 @@ export default function AdminArticlesPage() {
                     key={page}
                     type="button"
                     onClick={() => setCurrentPage(page)}
-                    className={`min-w-9 h-9 px-2 rounded-full text-sm font-semibold border transition-colors cursor-pointer ${safePage === page
+                    className={`min-w-9 h-9 px-2 rounded-full text-sm font-semibold border transition-colors cursor-pointer ${
+                      safePage === page
                         ? 'bg-[#0C4A6E] text-white border-[#0C4A6E]'
                         : 'bg-white text-[#1F2937] border-gray-300 hover:bg-gray-50'
-                      }`}
+                    }`}
                   >
                     {page}
                   </button>
